@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Deploy services/sally-api to campingpi and (re)start its systemd unit.
+# Reads Pi creds from the repo-root .env (PI_HOST, PI_USER, PI_PASSWORD).
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+set -a; . "$REPO/.env"; set +a
+export SSHPASS="$PI_PASSWORD"
+SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15)
+
+echo "==> ensuring /opt/sally on $PI_HOST"
+sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
+  "sudo mkdir -p /opt/sally/sally-api && sudo chown -R $PI_USER:$PI_USER /opt/sally"
+
+echo "==> syncing service files"
+sshpass -e rsync -az --delete -e "ssh ${SSH_OPTS[*]}" \
+  "$REPO/services/sally-api/" "$PI_USER@$PI_HOST:/opt/sally/sally-api/"
+
+echo "==> installing systemd unit"
+sshpass -e scp "${SSH_OPTS[@]}" "$REPO/configs/media/sally-api.service" \
+  "$PI_USER@$PI_HOST:/tmp/sally-api.service"
+sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
+  "sudo mv /tmp/sally-api.service /etc/systemd/system/sally-api.service \
+   && sudo systemctl daemon-reload \
+   && sudo systemctl enable sally-api.service \
+   && sudo systemctl restart sally-api.service \
+   && sleep 1 && systemctl is-active sally-api.service"
+
+echo "==> deployed. verify:"
+echo "    curl -s http://$PI_HOST:8090/api/state | jq"

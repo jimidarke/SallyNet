@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- HomeHub — mascot hero + nav tiles + live status ribbon. -->
+<component name="HomeHub" extends="Group">
+    <interface>
+        <field id="state" type="assocarray" onChange="onState" />
+        <field id="selectedRoute" type="string" value="" />
+    </interface>
+    <script type="text/brightscript" uri="HomeHub.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8DCC8FF" />
+
+        <!-- header band + twin stripe + title + 85 badge -->
+        <Rectangle width="1920" height="120" color="0xE8A044FF" />
+        <Rectangle translation="[0, 120]" width="1920" height="5" color="0xC8462EFF" />
+        <Rectangle translation="[0, 125]" width="1920" height="5" color="0xE8702EFF" />
+        <Label translation="[60, 36]" color="0x2B2A26FF" font="font:LargeBoldSystemFont" text="SallyNet" />
+        <Rectangle translation="[1740, 30]" width="120" height="60" color="0xC8462EFF" />
+        <Label translation="[1740, 40]" width="120" horizAlign="center"
+               color="0xFAF6EEFF" font="font:MediumBoldSystemFont" text="85" />
+
+        <!-- mascot hero -->
+        <Poster uri="pkg:/images/mascot.png" width="520" height="287"
+                translation="[60, 240]" loadDisplayMode="scaleToFit" />
+
+        <!-- nav tiles -->
+        <LayoutGroup id="tiles" layoutDirection="horiz" itemSpacings="[28]"
+                     translation="[60, 640]" />
+
+        <!-- status ribbon -->
+        <Rectangle translation="[0, 1000]" width="1920" height="80" color="0x2B2A26E6" />
+        <Label id="ribbon" translation="[60, 1024]" width="1800"
+               color="0xFAF6EEFF" font="font:MediumSystemFont" text="" />
+    </children>
+</component>

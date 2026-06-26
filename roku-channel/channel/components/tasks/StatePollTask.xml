@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  StatePollTask — one-shot GET /api/state off the render thread.
+  MainScene fires control="RUN" on a Timer and observes `state`.
+  (Adapted from Delta Cam's Task-based roUrlTransfer fetch.)
+-->
+<component name="StatePollTask" extends="Task">
+    <interface>
+        <field id="snapshot" type="assocarray" />
+        <field id="ok" type="boolean" value="false" />
+    </interface>
+    <script type="text/brightscript" uri="StatePollTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+</component>

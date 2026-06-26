@@ -1,0 +1,48 @@
+0.3.0
+
+## Changelog
+
+### 0.3.0 (2026-06-26)
+- **Phase 0 of the SallyNet glass dashboard — built, sideloaded, and verified live on Camperoku** (renders live drive data; other tabs are placeholders).
+- New `services/sally-api/` — Flask backend on the Pi (`:8090`, systemd unit) serving `/api/state` live from gpsd: the single HTTP surface the Roku polls (+ `/api/discovery`, `/api/health`). Frozen contract in `subsystems/media/api-contract.md` (sections omitted, never `null`).
+- GPS operational: u-blox 8 (UBX-M8030) on the Pi, `gpsd 3.17` serving a 3D DGPS fix. Buster apt repointed to `legacy.raspbian.org` to install (EOL-mirror fix).
+- New `roku-channel/` — the **SallyNet** Roku channel (forked from `rokuApp`/HouseWall + Delta Cam toolchain): Splash→Home→Drive route stack, `StatePollTask` poll loop, auto Drive/Home modeController, sunset branding + mascot.
+- Repo **consolidated to a single git repo** at `sallyNet/` — Roku channel folded into `roku-channel/` (was a separate repo).
+- Decisions locked: MQTT-first (no Home Assistant on the critical path); backend = Pi stopgap → N100 at Phase 3; audio = RF headphones (movies) + BETS-1 FM (music); tanks = reuse 1980s probes via ESP32 + CD4051; media = `/api/media` (encode-once MP4), retire MiniDLNA for the Roku path; fuel logger = ESP32 keypad + OLED at the driver's door (supersedes the cabin-numpad plan).
+- Master plan captured; docs swept for stale references (gps / media / tanks / telemetry / current-state / CLAUDE.md / network-diagram).
+
+### 0.2.0 (2026-05-17)
+- New `subsystems/audio/` — unified audio system with three simultaneous output paths (Snapcast over WiFi to phones, BT A2DP to one of four owned speakers, BETS-1-legal FM broadcast); QX-18 USB handheld mic for PTT/PA mode
+- Architecture decision: **mini-PC (Intel N100 class) becomes Sally's always-on services host** — runs audio, telemetry collector, Roku channel media server, MQTT broker, gpsd. Avoids ESP32 WiFi+BT radio conflict learned from the Halloween project (separate physical radios on x86).
+- Pi 3B stays untouched as the pure RetroPie appliance — no service cohabitation
+- New `subsystems/comms/amateur-radio-path.md` — Canadian Amateur Radio Basic Qualification path documented as the **legal** answer to camper-to-camper duplex voice. ISED RIC-40 + BETS-1 research determined the FM-band-duplex idea was not legally viable.
+- Hard rule recorded in `subsystems/audio/fm-broadcast.md`: BETS-1 cap is < 1 µW EIRP; no power amps, no high-gain antenna stacking
+- Cross-references updated across compute, telemetry, media, comms, network-diagram, and CLAUDE.md
+
+### 0.1.3 (2026-05-17)
+- New `subsystems/telemetry/` — fuel-economy-vs-conditions pipeline: BLE wheel-speed sensor (CSC profile), BME280 (outside temp + barometric), DS18B20 (engine bay), gpsd for position/elevation, SQLite store on the Pi, Grafana/HA dashboards
+- Cabin UI layer: wireless USB-dongle numpad + small HDMI screen → glance + fuel-log entry modes
+- New `docs/fuel-log.md` — manual fill-up log, source of truth; works standalone today, joins to telemetry data by date+odometer once Phase 1+ lands
+- Suggested splitting telemetry off to a dedicated 2nd Pi (Zero 2 W or another 3B) to avoid cohabiting with RetroPie
+
+### 0.1.2 (2026-05-17)
+- Coach model identified: Okanagan **MM226RB** (Mini Motorhome, ~22'6", Rear Bath)
+- Added hot water tank + interior bathtub to current state
+- Logged oil top-up (~3.5 L 10W-30) and noted minor oil leak / smoke (mechanic TBD)
+- Captured previous-owner mods: beefed-up engine fan + cut-out in air-intake area for more airflow
+- Transmission fluid noted as good on dipstick
+
+### 0.1.1 (2026-05-17)
+- VIN decode (…B40728 → 1985 Ford E-350 cutaway, 7.5L/460 V8, Lorain OH)
+- Captured GVWR / GAWR and chassis specs in `docs/mechanics.md`
+- Added concrete battery + converter inventory (2× 800CCA engine + 600CA house, PD4135KW2B charger, AC breaker map, DC loads)
+- Documented fuel system fault (selector valve crossed; rear tank draws only when switch is FRONT)
+- Added new media items: Pyle TV w/ DVD, AGPtek mini 1080, 9" 4-camera backup TFT with RCA out
+- New roadmap idea: live backup-cam-to-Roku with GPS overlay while driving
+- Updated comms with ANNTLENT band 2/5/12/17 booster + Uniden FRS chargers
+- Noted broken Dometic RM763 (storage now), DPHCF42-12V pump (new), no A/C
+
+### 0.1.0 (2026-05-16)
+- Initial sallyNet scaffold — CLAUDE.md, README, docs/, subsystems/, scripts/, configs/
+- Captured current-state inventory of Sally's installed tech (network, media, compute, tanks, power, propane)
+- Roadmap stubs for: Roku channel fork, Pi media server, GPS tracker, WiFi-as-WAN + captive portal, WLED ambient lighting, FRS comms, cell booster docs, holding tank sensor retrofit, house battery monitoring, mechanics reference

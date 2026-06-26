@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  MainScene — route stack + modeController + poll owner.
+  Generalizes HouseWall's 2-mode router into Splash/Home/Drive (more screens land
+  in later phases). Owns StatePollTask + the heartbeat Timer; observes the poll
+  field and fans the snapshot to the active screen.
+-->
+<component name="MainScene" extends="Scene">
+    <interface>
+        <field id="args" type="assocarray" onChange="onArgs" />
+    </interface>
+    <script type="text/brightscript" uri="MainScene.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0xE8DCC8FF" />
+
+        <SplashScreen id="splash" />
+        <HomeHub id="home" visible="false" />
+        <DriveScreen id="drive" visible="false" />
+
+        <!-- minimal toast (no HouseWall Toast component needed yet) -->
+        <Rectangle id="toastBg" translation="[560, 60]" width="800" height="76"
+                   color="0x2B2A26E6" visible="false" />
+        <Label id="toast" translation="[560, 84]" width="800" horizAlign="center"
+               color="0xFAF6EEFF" font="font:MediumBoldSystemFont" text="" visible="false" />
+
+        <StatePollTask id="poll" />
+        <Timer id="stateTimer" repeat="true" duration="5" />
+        <Timer id="splashTimer" repeat="false" duration="2" />
+        <Timer id="toastTimer" repeat="false" duration="2.5" />
+    </children>
+</component>

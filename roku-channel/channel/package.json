@@ -1,0 +1,21 @@
+{
+  "name": "sallynet-roku",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SallyNet — sideloaded Roku glass dashboard for Sally the motorhome. Polls the Pi sally-api and renders trip/camp/media/cameras/systems screens.",
+  "scripts": {
+    "build": "bsc",
+    "lint": "bsc --noEmit",
+    "package": "bsc --create-package --package-path dist/sallynet.zip",
+    "deploy": "node scripts/deploy.js",
+    "assets": "python3 scripts/generate_brand_assets.py",
+    "test:unit": "node tests/unit/run.js",
+    "test:smoke": "bash tests/smoke/smoke.sh",
+    "clean": "rm -rf dist out"
+  },
+  "devDependencies": {
+    "@rokucommunity/brs": "^0.47.4",
+    "brighterscript": "^0.69.0",
+    "roku-deploy": "^3.12.0"
+  }
+}

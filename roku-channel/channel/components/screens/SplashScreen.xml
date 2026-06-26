@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- SplashScreen — mascot hero on golden-hour; shown until first /api/state. -->
+<component name="SplashScreen" extends="Group">
+    <interface>
+        <field id="status" type="string" value="Connecting…" onChange="onStatus" />
+    </interface>
+    <script type="text/brightscript" uri="SplashScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8A044FF" />
+        <Poster id="mascot" uri="pkg:/images/mascot.png"
+                width="900" height="496" translation="[510, 230]"
+                loadDisplayMode="scaleToFit" />
+        <Label translation="[0, 770]" width="1920" horizAlign="center"
+               color="0x2B2A26FF" font="font:LargeBoldSystemFont" text="SallyNet" />
+        <Label id="status" translation="[0, 850]" width="1920" horizAlign="center"
+               color="0x2B2A26AA" font="font:MediumSystemFont" text="Connecting…" />
+    </children>
+</component>

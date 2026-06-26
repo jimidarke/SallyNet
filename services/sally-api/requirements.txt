@@ -1,0 +1,5 @@
+# sally-api runtime deps.
+# On campingpi (Buster) Flask 1.0.2 is already installed system-wide and is used as-is
+# (no venv needed for Phase 0). gpsd is read via a raw socket — no python3-gps required.
+# Pin for when this moves to the N100 / a venv:
+Flask>=1.0

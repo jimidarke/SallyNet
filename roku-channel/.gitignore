@@ -1,0 +1,15 @@
+# Secrets / local
+.env
+.env.*
+!.env.example
+
+# Roku build artifacts
+channel/dist/
+channel/out/
+node_modules/
+
+# OS / editor
+.DS_Store
+*.swp
+.vscode/
+.idea/

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- NavTile — focusable hub tile with twin red+orange focus stripe. -->
+<component name="NavTile" extends="Group">
+    <interface>
+        <field id="tileLabel" type="string" onChange="onRender" />
+        <field id="route" type="string" />
+        <field id="focused" type="boolean" value="false" onChange="onRender" />
+        <field id="enabled" type="boolean" value="true" onChange="onRender" />
+    </interface>
+    <script type="text/brightscript" uri="NavTile.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Rectangle id="card" width="280" height="180" color="0xE8DCC8FF" />
+        <Label id="label" translation="[0, 120]" width="280" height="44"
+               horizAlign="center" vertAlign="center" color="0x2B2A26FF"
+               font="font:MediumBoldSystemFont" text="" />
+        <Rectangle id="stripeRed" translation="[0, 172]" width="280" height="4" color="0xC8462EFF" visible="false" />
+        <Rectangle id="stripeOrange" translation="[0, 176]" width="280" height="4" color="0xE8702EFF" visible="false" />
+    </children>
+</component>

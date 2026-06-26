@@ -1,0 +1,20 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Scratch / build artifacts
+scratch/
+dist/
+out/
+node_modules/
+*.log

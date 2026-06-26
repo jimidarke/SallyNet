@@ -1,0 +1,17 @@
+[Unit]
+Description=Sally dashboard API (sally-api) — the Roku-facing HTTP surface on :8090
+After=network-online.target gpsd.socket
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/sally/sally-api
+ExecStart=/usr/bin/python3 /opt/sally/sally-api/app.py
+Restart=on-failure
+RestartSec=3
+# Override the home anchor / port here if needed:
+# Environment=SALLY_HOME_LAT=53.5461 SALLY_HOME_LON=-113.4938 SALLY_API_PORT=8090
+
+[Install]
+WantedBy=multi-user.target
