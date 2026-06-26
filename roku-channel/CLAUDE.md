@@ -29,5 +29,7 @@ registry/`apiBase` change with no channel edits.
   Dev mode ON. Dev password: `ROKU_DEV_PASSWORD` in the gitignored `roku-channel/.env`. ECP on `:8060`, debug telnet `:8085`.
 
 ## Phases (see sallyNet plan)
-P0 shell (Splash/Home/Drive + poll) → P1 Media → P2 Camp/Systems (sensors via MQTT) →
-P3 Cameras (go2rtc) → P4 audio status → P5 Photos → P6 router → P7 propane/AC.
+P0 shell ✅ → **P1 Media ✅** (RowList rows-as-trips, `VodPlayer` MP4 + trick-play + resume) →
+P2 Camp/Systems (sensors via MQTT) → P3 Cameras (go2rtc) → P4 audio status →
+**P5 Photos ✅** (slideshow + guest-upload QR; built alongside P1) → P6 router → P7 propane/AC.
+New media files: `source/Media.brs`, `components/tasks/MediaListTask`, `components/screens/{MediaScreen,VodPlayer,PhotoGallery,QrScreen}`, `components/widgets/MediaCard`.

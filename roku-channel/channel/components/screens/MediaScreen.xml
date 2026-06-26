@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- MediaScreen — browse home videos as a RowList (one row per trip/collection).
+     MainScene sets videoCatalog; selecting an item publishes selectedItem. -->
+<component name="MediaScreen" extends="Group" initialFocus="rows">
+    <interface>
+        <field id="videoCatalog" type="node" onChange="onCatalog" />
+        <field id="selectedItem" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="MediaScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Media.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8DCC8FF" />
+
+        <!-- header band + twin stripe + title + clock (matches HomeHub) -->
+        <Rectangle width="1920" height="120" color="0xE8A044FF" />
+        <Rectangle translation="[0, 120]" width="1920" height="5" color="0xC8462EFF" />
+        <Rectangle translation="[0, 125]" width="1920" height="5" color="0xE8702EFF" />
+        <Label translation="[60, 36]" color="0x2B2A26FF" font="font:LargeBoldSystemFont" text="Media" />
+        <Label id="clock" translation="[1500, 44]" width="360" horizAlign="right"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+
+        <RowList id="rows" translation="[60, 200]"
+                 itemComponentName="MediaCard"
+                 numRows="2"
+                 rowItemSize="[[300, 224]]"
+                 rowHeights="[260]"
+                 rowItemSpacing="[[20, 0]]"
+                 itemSize="[1800, 524]"
+                 rowLabelOffset="[[0, 8]]"
+                 showRowLabel="[true]"
+                 rowTitleComponentName=""
+                 focusBitmapBlendColor="0x00000000"
+                 drawFocusFeedback="false"
+                 vertFocusAnimationStyle="floatingFocus"
+                 rowFocusAnimationStyle="fixedFocusWrap" />
+
+        <!-- focused-item detail strip -->
+        <Label id="detail" translation="[60, 980]" width="1800" height="60"
+               color="0x2B2A26FF" font="font:MediumSystemFont" text="" />
+
+        <!-- empty state -->
+        <Label id="empty" translation="[60, 480]" width="1800" horizAlign="center"
+               color="0x2B2A26AA" font="font:LargeBoldSystemFont"
+               text="No videos yet — scan the QR on the Photos screen to send some!" visible="false" />
+    </children>
+</component>

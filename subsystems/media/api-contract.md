@@ -19,10 +19,14 @@ Roku code edits.
 | `/api/discovery` | GET | stub (P3) | `{schemaVersion, host, streams:{}}` — camera stream URLs |
 | `/api/health` | GET | **live (P0)** | `{ok, gps_fix, ts}` quick liveness |
 | `/api/map.png?z=&w=&h=` | GET | P2 | offline‑rendered PNG centered on current GPS |
-| `/api/media?type=movies\|tv\|kids` | GET | P1 | JSON catalog (title, url, poster, duration, codec) |
-| `/media/<path>` | GET | P1 | faststart H.264 MP4, HTTP Range |
+| `/api/media?type=trips` | GET | **live (P1)** | home‑media collections (trips/drone/memories/unsorted) |
+| `/api/media?type=movies\|tv\|kids` | GET | reserved | studio library — empty `collections` until built |
+| `/api/collections/<id>` | GET | **live (P1)** | items (videos+photos) within one collection |
+| `/media/<path>` | GET | **live (P1)** | faststart H.264 MP4 / JPEG, **HTTP Range** (206) |
 | `/api/level.png` | GET | P2 | pre‑rendered leveling bubble PNG |
-| `/api/photos` · `/api/qr.png` | GET/POST | P5 | slideshow list · QR · phone upload |
+| `/api/photos[?collection=<id>]` | GET | **live (P5)** | flat slideshow list |
+| `/api/qr.png` | GET | **live (P5)** | QR encoding the LAN upload URL guests scan |
+| `/api/upload` · `/upload` | POST · GET | **live (P5)** | guest upload endpoint · mobile upload page |
 | `/api/fuel-log` | POST | P2 | ESP32 door logger → appends `docs/fuel-log.md` + SQLite |
 
 ## `/api/state` schema (v1)
@@ -70,6 +74,59 @@ sections that are simply absent until their phase lands.
   Systems screen.
 - Sensor blocks (`power`/`tanks`/`env`/`level`/`cameras`/`audio`) are **omitted** until their
   phase fills them — never emitted as `null`.
+
+## Home media (P1/P5)
+
+Home‑made content (camping trips, family memories, drone footage) is a **new collections
+category**, additive to schema v1 (the Roku ignores unknown keys; existing `/api/state`
+unchanged). The Roku reads `catalog.json` (rebuilt from per‑item sidecars by
+`scripts/media-reindex.py`) sliced into these shapes. Same omit‑not‑null rule: `gps`,
+`place`, `uploader` etc. are **omitted** when unknown.
+
+```jsonc
+// GET /api/media?type=trips  — the browse rows (one per collection)
+{ "schemaVersion": 1, "type": "trips",
+  "collections": [
+    { "id": "2026-07-04--jasper-icefields", "kind": "trip",   // kind: trip|bucket
+      "title": "Jasper & the Icefields",
+      "poster": "/media/trips/2026-07-04--jasper-icefields/thumbs/cover.jpg",
+      "itemCount": 42, "videoCount": 8, "photoCount": 34,
+      "dateStart": "2026-07-04", "dateEnd": "2026-07-07",
+      "place": "Jasper, AB",                                   // omitted if unknown
+      "detailUrl": "/api/collections/2026-07-04--jasper-icefields" } ] }
+
+// GET /api/collections/<id>  — items within a collection (404 if unknown id)
+{ "schemaVersion": 1, "id": "...", "kind": "trip", "title": "...",
+  "dateStart": "...", "dateEnd": "...", "place": "...",
+  "items": [
+    { "id": "abc123", "type": "video", "title": "Athabasca Falls",
+      "url": "/media/trips/.../videos/2026-07-04T14-22-31--abc123.mp4",
+      "poster": "/media/trips/.../thumbs/2026-07-04T14-22-31--abc123.jpg",
+      "durationSec": 47, "codec": "h264", "width": 1920, "height": 1080,
+      "captureDatetime": "2026-07-04T14:22:31-06:00",
+      "gps": { "lat": 52.66, "lon": -117.88 }, "uploader": "Aunt Robin" } ] }
+
+// GET /api/photos[?collection=<id>]  — flat slideshow list (newest first)
+{ "schemaVersion": 1,
+  "photos": [ { "id": "def456", "url": "/media/.../photos/...jpg",
+                "poster": "/media/.../thumbs/...jpg",
+                "captureDatetime": "2026-07-04T15:01:10-06:00",
+                "gps": { "lat": 52.66, "lon": -117.88 },
+                "collectionId": "2026-07-04--jasper-icefields", "title": "..." } ] }
+
+// POST /api/upload  (multipart/form-data: files[], uploader?, trip?, tripTitle?, lat?, lon?)
+{ "schemaVersion": 1, "ok": true, "batchId": "2026-07-04T19-40-02--7c3f",
+  "accepted": [ { "name": "IMG_0421.HEIC", "bytes": 3145728 } ],
+  "rejected": [ { "name": "notes.txt", "reason": "unsupported_type" } ] }
+```
+
+- **URLs are root‑relative** (`/media/<path>`, `/api/collections/<id>`); the Roku prepends
+  its `SALLY_API_BASE` host. `/media/<path>` resolves under `MEDIA_ROOT` (traversal rejected)
+  and honors `Range` (mandatory for Roku MP4 seeking — returns `206` + `Content-Range` +
+  `Accept-Ranges: bytes`).
+- **MP4s are faststart + CFR**, H.264 High@L4.2 ≤1080p (the gold‑standard encode profile).
+- `captureDatetime` is ISO‑8601 with offset; the Roku formats its own display label.
+- The studio `type=movies|tv|kids` catalog is reserved — currently returns empty `collections`.
 
 ## Versioning policy
 Additive fields are non‑breaking (Roku ignores unknown keys). Renames/removals/semantic

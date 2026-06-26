@@ -26,6 +26,21 @@ function SN_REG_SECTION()    as string  : return "sallynet" : end function
 function SN_CACHE_VER()      as integer : return 1 : end function
 function SN_REG_API_BASE()   as string  : return "apiBase" : end function
 function SN_REG_LAST_STATE() as string  : return "lastStateV1" : end function
+function SN_REG_MEDIA_CATALOG() as string : return "mediaCatalogV1" : end function
+function SN_REG_PHOTO_CATALOG() as string : return "photoCatalogV1" : end function
+function SN_REG_RESUME_PREFIX() as string : return "resume:" : end function   ' resume:<contentid> -> seconds
+
+' --- media UI tunables ---------------------------------------------------
+function SN_SLIDESHOW_MS()   as integer : return 6000 : end function
+function SN_VOD_WATCHDOG_S() as integer : return 90 : end function
+
+' Reconnect backoff (mirrors HouseWall): 2s, 5s, 10s, 30s…
+function snNextBackoffSeconds(attempt as integer) as integer
+    if attempt <= 1 then return 2
+    if attempt = 2 then return 5
+    if attempt = 3 then return 10
+    return 30
+end function
 
 function regRead(key as string) as string
     section = createObject("roRegistrySection", SN_REG_SECTION())
@@ -143,4 +158,16 @@ function snNowSeconds() as integer
     d = createObject("roDateTime")
     d.Mark()
     return d.AsSeconds()
+end function
+
+' ISO date ("2026-07-04T..." or "2026-07-04") -> "Jul 4, 2026". Falls back to the
+' raw string if it doesn't look like a date.
+function snDateLabelFromIso(iso as dynamic) as string
+    if iso = invalid then return ""
+    s = iso.toStr()
+    if Len(s) < 10 then return s
+    months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    mi = Mid(s, 6, 2).toInt()
+    if mi < 1 or mi > 12 then return s
+    return months[mi] + " " + Mid(s, 9, 2).toInt().toStr() + ", " + Mid(s, 1, 4)
 end function

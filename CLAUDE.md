@@ -35,11 +35,14 @@ Three-layer organisation:
 /etc/snapcast/snapserver.conf              # Snapcast multi-room sync
 /etc/mpd.conf                              # MPD → snapserver FIFO
 /etc/librespot/librespot.toml              # Spotify Connect endpoint "Sally"
-/srv/sally-media/                          # Roku channel media HTTP service mounts here
+/srv/sally-media/                          # N100 target for the HDD `home/` tree (Phase 3 migration of /mnt/usb/home)
 /opt/pa-duck/                              # QX-18 PTT capture + ducking service
 
-# Raspberry Pi 3B+ (Rev 1.4, in cabinet behind TV) — RetroPie ONLY post-mini-PC migration; WiFi+BT disabled, wired eth0
-/home/pi/sally-media/                      # (legacy) HDD mount — moves to mini-PC at Phase 1
+# Raspberry Pi 3B+ (Rev 1.4, in cabinet behind TV) — RetroPie + Phase-0/1 always-on services; WiFi+BT disabled, wired eth0
+/opt/sally/sally-api/                      # sally-api Flask service (/api/state + /api/media + /media Range + /api/upload + /api/qr.png + /upload)
+/opt/sally/media/                          # media pipeline: media-ingest.sh, media-encode-*.sh, media-extract-meta.py, media-track-logger.py, media-reindex.py, sally-media.conf
+/mnt/usb/home/                             # home-media tree on the HDD: inbox/ work/ library/{trips,drone,memories,unsorted} originals/ catalog/items/ failed/ logs/
+/var/lib/sally/                            # Pi LOCAL disk (NOT exFAT): catalog.json read-model + tracks/ GPS breadcrumbs
 /etc/gpsd.conf                             # (legacy) gpsd moves to mini-PC
 /opt/traccar-client/                       # (legacy) Traccar client moves to mini-PC
 /dev/serial0  ->  ttyAMA0                  # PL011 UART (BT disabled + enable_uart=1) — ready for the QX210 RS232/DTU link

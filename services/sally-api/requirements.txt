@@ -3,3 +3,8 @@
 # (no venv needed for Phase 0). gpsd is read via a raw socket — no python3-gps required.
 # Pin for when this moves to the N100 / a venv:
 Flask>=1.0
+# Home-media (P1/P5): QR generation for the guest upload page, and a real WSGI server
+# so concurrent multi-GB guest uploads don't block. qrcode pulls in Pillow.
+qrcode>=6.0
+Pillow>=5.0
+waitress>=1.4

@@ -4,12 +4,18 @@ sub init()
     m.splash = m.top.findNode("splash")
     m.home = m.top.findNode("home")
     m.drive = m.top.findNode("drive")
+    m.media = m.top.findNode("media")
+    m.vod = m.top.findNode("vod")
+    m.photos = m.top.findNode("photos")
+    m.qr = m.top.findNode("qr")
+    m.list = m.top.findNode("mediaList")
     m.toast = m.top.findNode("toast")
     m.toastBg = m.top.findNode("toastBg")
     m.poll = m.top.findNode("poll")
     m.stateTimer = m.top.findNode("stateTimer")
     m.splashTimer = m.top.findNode("splashTimer")
     m.toastTimer = m.top.findNode("toastTimer")
+    m.qrParent = "photos"
 
     m.route = "splash"
     m.haveState = false
@@ -23,6 +29,16 @@ sub init()
     m.splashTimer.observeField("fire", "onSplashElapsed")
     m.toastTimer.observeField("fire", "onToastHide")
     m.home.observeField("selectedRoute", "onHomeSelect")
+
+    ' media wiring
+    m.media.observeField("selectedItem", "onMediaSelect")
+    m.vod.observeField("requestBack", "onChildBack")
+    m.photos.observeField("requestBack", "onChildBack")
+    m.photos.observeField("requestQr", "onPhotosQr")
+    m.qr.observeField("requestBack", "onChildBack")
+    m.list.observeField("videoCatalog", "onVideoCatalog")
+    m.list.observeField("photoCatalog", "onPhotoCatalog")
+    m.list.control = "RUN"
 
     ' Fast-paint from cached state.
     cached = readCachedState()
@@ -116,17 +132,43 @@ function isPassive(route as string) as boolean
 end function
 
 sub go(route as string)
+    ' Free the single H.264 decoder when leaving the player (decoder discipline).
+    if m.route = "vod" and route <> "vod" then m.vod.active = false
+
     m.splash.visible = (route = "splash")
     m.home.visible = (route = "home")
     m.drive.visible = (route = "drive")
+    m.media.visible = (route = "media")
+    m.vod.visible = (route = "vod")
+    m.photos.visible = (route = "photos")
+    m.qr.visible = (route = "qr")
     m.route = route
+
     if route = "home" then
         m.home.setFocus(true)
     else if route = "drive" then
         m.drive.setFocus(true)
+    else if route = "media" then
+        m.media.setFocus(true)
+    else if route = "photos" then
+        m.photos.setFocus(true)
+    else if route = "qr" then
+        m.qr.setFocus(true)
+    else if route = "vod" then
+        m.vod.active = true   ' onActive -> startPlayback -> focuses the Video
     end if
     slEvent("route", { to: route })
 end sub
+
+' Back climbs the route stack: vod->media->home, photos->home, qr->photos.
+function routeParent(route as string) as string
+    if route = "vod" then return "media"
+    if route = "media" then return "home"
+    if route = "photos" then return "home"
+    if route = "qr" then return m.qrParent
+    if route = "drive" then return "home"
+    return "home"
+end function
 
 sub onHomeSelect()
     r = m.home.selectedRoute
@@ -137,18 +179,49 @@ sub onHomeSelect()
     end if
     if r = "drive" then
         go("drive")
+    else if r = "media" then
+        m.list.control = "RUN"
+        go("media")
+    else if r = "photos" then
+        m.list.control = "RUN"
+        go("photos")
     else
         showToast(r + " - coming soon")
     end if
 end sub
 
+sub onMediaSelect()
+    it = m.media.selectedItem
+    if it = invalid then return
+    m.vod.item = it
+    go("vod")
+end sub
+
+sub onPhotosQr()
+    if m.photos.requestQr <> true then return
+    m.qrParent = "photos"
+    m.qr.refresh = true
+    go("qr")
+end sub
+
+sub onChildBack()
+    go(routeParent(m.route))
+end sub
+
+sub onVideoCatalog()
+    m.media.videoCatalog = m.list.videoCatalog
+end sub
+
+sub onPhotoCatalog()
+    m.photos.photoCatalog = m.list.photoCatalog
+end sub
+
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
     if key = "back" then
-        if m.route <> "home" then
-            go("home")
-            return true
-        end if
+        if m.route = "home" or m.route = "splash" then return false
+        go(routeParent(m.route))
+        return true
     end if
     return false
 end function

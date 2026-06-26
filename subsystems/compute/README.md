@@ -17,7 +17,7 @@ Pi 3B+ (Rev 1.4) + ~1TB HDD + 2× USB controllers. **Today it is NOT pure RetroP
 
 All the always-on services land on the mini-PC, not the Pi:
 
-1. **Media HTTP server** for the Roku channel (`subsystems/media/`) — Python FastAPI on the mini-PC, serving `/api/media?type=movies|photos` from `/srv/sally-media/` (the migrated HDD)
+1. **Media HTTP server** for the Roku channel (`subsystems/media/`) — **already live on the Pi** as `sally-api` (Flask, `:8090`) serving `/api/media?type=trips` + `/api/collections/<id>` + `/api/photos` + `/media/<path>` (Range), plus the encode/ingest pipeline at `/opt/sally/media/`. At Phase 3 this moves to the mini-PC (HDD `home/` tree migrates to `/srv/sally-media/`); the Roku just repoints `apiBase`.
 2. **GPS tracker** (`subsystems/gps/`) — gpsd + Traccar client on the mini-PC
 3. **MQTT broker** — mosquitto on the mini-PC for WLED + power + tank + telemetry sensors to publish into; bridge home to the existing Home Assistant estate (see `homeController`)
 4. **Telemetry collector** (`subsystems/telemetry/`) — Python service on the mini-PC reading BLE wheel speed, BME280, DS18B20, gpsd; writing to SQLite

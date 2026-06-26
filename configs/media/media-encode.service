@@ -1,0 +1,16 @@
+[Unit]
+Description=SallyNet media ingest — drain the inbox, encode to the gold-standard profile
+After=network-online.target
+# Heavy ffmpeg work; idle priority so it never starves gpsd / sally-api on the Pi 3B+.
+
+[Service]
+Type=oneshot
+User=pi
+EnvironmentFile=-/opt/sally/media/sally-media.conf
+ExecStart=/opt/sally/media/media-ingest.sh --once
+Nice=15
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+
+[Install]
+WantedBy=multi-user.target

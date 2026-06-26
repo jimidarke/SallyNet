@@ -1,0 +1,17 @@
+[Unit]
+Description=SallyNet GPS breadcrumb logger — daily GPX for media geotag correlation
+After=gpsd.socket network-online.target
+Wants=gpsd.socket
+
+[Service]
+Type=simple
+User=pi
+EnvironmentFile=-/opt/sally/media/sally-media.conf
+ExecStart=/usr/bin/python3 /opt/sally/media/media-track-logger.py
+Restart=on-failure
+RestartSec=5
+# Gentle — it's a slow poll; never compete with gpsd/sally-api.
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

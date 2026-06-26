@@ -18,6 +18,10 @@
         <SplashScreen id="splash" />
         <HomeHub id="home" visible="false" />
         <DriveScreen id="drive" visible="false" />
+        <MediaScreen id="media" visible="false" />
+        <VodPlayer id="vod" visible="false" />
+        <PhotoGallery id="photos" visible="false" />
+        <QrScreen id="qr" visible="false" />
 
         <!-- minimal toast (no HouseWall Toast component needed yet) -->
         <Rectangle id="toastBg" translation="[560, 60]" width="800" height="76"
@@ -26,6 +30,7 @@
                color="0xFAF6EEFF" font="font:MediumBoldSystemFont" text="" visible="false" />
 
         <StatePollTask id="poll" />
+        <MediaListTask id="mediaList" />
         <Timer id="stateTimer" repeat="true" duration="5" />
         <Timer id="splashTimer" repeat="false" duration="2" />
         <Timer id="toastTimer" repeat="false" duration="2.5" />

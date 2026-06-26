@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- MediaCard — RowList item: poster + caption + twin red/orange focus stripe.
+     RowList sets itemContent (a browse ContentNode) and focusPercent on each item. -->
+<component name="MediaCard" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContent" />
+        <field id="focusPercent" type="float" value="0.0" onChange="onFocusChange" />
+        <field id="width" type="float" value="300" />
+        <field id="height" type="float" value="224" />
+    </interface>
+    <script type="text/brightscript" uri="MediaCard.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Poster id="poster" width="300" height="169" loadDisplayMode="scaleToZoom"
+                uri="pkg:/images/transparent.png" />
+        <Rectangle id="stripeRed" translation="[0, 169]" width="300" height="4" color="0xC8462EFF" visible="false" />
+        <Rectangle id="stripeOrange" translation="[0, 173]" width="300" height="4" color="0xE8702EFF" visible="false" />
+        <Label id="cap" translation="[4, 182]" width="292" height="40"
+               color="0x2B2A26FF" font="font:SmallSystemFont" wrap="false" />
+    </children>
+</component>

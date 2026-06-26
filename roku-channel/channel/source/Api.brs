@@ -11,6 +11,19 @@ function snStateUrl() as string : return snApiBase() + "/api/state" : end functi
 function snDiscoveryUrl() as string : return snApiBase() + "/api/discovery" : end function
 function snMediaUrl(kind as string) as string : return snApiBase() + "/api/media?type=" + kind : end function
 
+' --- home media (P1/P5) --------------------------------------------------
+function snMediaTripsUrl() as string : return snMediaUrl("trips") : end function
+function snCollectionUrl(id as string) as string : return snApiBase() + "/api/collections/" + id : end function
+function snPhotosUrl() as string : return snApiBase() + "/api/photos" : end function
+function snQrUrl() as string : return snApiBase() + "/api/qr.png" : end function
+
+' Absolutize a catalog url/poster/thumb that may be root-relative ("/media/..").
+function snMediaItemUrl(p as dynamic) as string
+    if p = invalid or p = "" then return ""
+    if Left(p, 4) = "http" then return p
+    return snApiBase() + p
+end function
+
 function snMapUrl(w as integer, h as integer, z as integer) as string
     return snApiBase() + "/api/map.png?w=" + w.toStr() + "&h=" + h.toStr() + "&z=" + z.toStr()
 end function

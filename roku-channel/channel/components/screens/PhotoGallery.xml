@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  PhotoGallery — fullscreen slideshow. Two posters ping-pong so the on-screen image is
+  never the one still loading (no blank between slides). Auto-advances; D-pad steps;
+  OK pauses; Info opens the QR upload screen; Back returns. Backend pre-downscales to
+  <=1080p so the full-res url is safe on a fullscreen Poster.
+-->
+<component name="PhotoGallery" extends="Group" initialFocus="sink">
+    <interface>
+        <field id="photoCatalog" type="assocarray" onChange="onCatalog" />
+        <field id="requestBack" type="boolean" value="false" alwaysNotify="true" />
+        <field id="requestQr" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="PhotoGallery.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0x16150FFF" />
+        <Poster id="posterA" width="1920" height="1080" loadDisplayMode="scaleToFit"
+                opacity="1.0" uri="pkg:/images/transparent.png" />
+        <Poster id="posterB" width="1920" height="1080" loadDisplayMode="scaleToFit"
+                opacity="0.0" uri="pkg:/images/transparent.png" />
+
+        <!-- meta scrim (bottom-left) + counter (top-right) -->
+        <Rectangle id="metaScrim" translation="[0, 940]" width="1100" height="140" color="0x00000099" visible="false" />
+        <Label id="metaDate" translation="[60, 968]" width="1000"
+               color="0xFAF6EEFF" font="font:MediumBoldSystemFont" text="" />
+        <Label id="metaSub" translation="[60, 1016]" width="1000"
+               color="0xFAF6EEBB" font="font:SmallSystemFont" text="" />
+        <Label id="counter" translation="[1500, 60]" width="360" horizAlign="right"
+               color="0xFAF6EECC" font="font:MediumSystemFont" text="" />
+
+        <Label id="empty" translation="[60, 480]" width="1800" horizAlign="center"
+               color="0xFAF6EEAA" font="font:LargeBoldSystemFont"
+               text="No photos yet — press Info to show the upload QR." visible="false" />
+
+        <Rectangle id="sink" width="1" height="1" color="0x00000000" />
+        <Timer id="autoAdvance" repeat="true" duration="6" />
+    </children>
+</component>

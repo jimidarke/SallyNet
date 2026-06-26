@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  MediaListTask — off-render-thread fetch of the home-media catalogs.
+  Builds a rows-as-trips ContentNode tree (videos) for MediaScreen and a flat photo
+  list for PhotoGallery. JSON parse + tree build happen here; only finished nodes
+  cross to the render thread. Modeled on StatePollTask.
+-->
+<component name="MediaListTask" extends="Task">
+    <interface>
+        <field id="videoCatalog" type="node" />
+        <field id="photoCatalog" type="assocarray" />
+        <field id="ok" type="boolean" value="false" />
+    </interface>
+    <script type="text/brightscript" uri="MediaListTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Media.brs" />
+</component>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  VodPlayer — progressive-MP4 player for home clips. Adapted from HouseWall LiveGroup:
+  keeps the watchdog + exponential backoff + reconnect overlay, but plays VOD
+  (streamFormat="mp4", no live), enables trick play, resumes from a registry bookmark,
+  and treats state="finished" as a normal EOF -> return to browse (never reconnect).
+  `active` gates start/stop so MainScene can free the single H.264 decoder on leave.
+
+  Inputs:  item (assoc {url,contentid,title,length,poster,dateLabel,place}), active (bool)
+  Output:  requestBack (bool, alwaysNotify)
+-->
+<component name="VodPlayer" extends="Group" initialFocus="player">
+    <interface>
+        <field id="item" type="assocarray" onChange="onItem" />
+        <field id="active" type="boolean" value="false" onChange="onActive" />
+        <field id="requestBack" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="VodPlayer.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x2B2A26FF" />
+        <Video id="player" width="1920" height="1080" translation="[0, 0]" />
+
+        <!-- Reconnect / error curtain (cream over the dark backdrop). -->
+        <Group id="reconnectOverlay" visible="false">
+            <Rectangle width="1920" height="1080" color="0xF7F1E3F2" />
+            <Label id="reconnectLabel" translation="[710, 500]" width="500" horizAlign="center"
+                   color="0x2B2A26FF" font="font:LargeBoldSystemFont" text="Reconnecting…" />
+            <Label id="reconnectSub" translation="[710, 560]" width="500" horizAlign="center"
+                   color="0x2B2A2699" font="font:SmallestSystemFont" text="" />
+        </Group>
+
+        <Timer id="watchdog" repeat="true" duration="60" />
+        <Timer id="backoff" repeat="false" duration="2" />
+        <Timer id="bookmarkTimer" repeat="true" duration="5" />
+    </children>
+</component>

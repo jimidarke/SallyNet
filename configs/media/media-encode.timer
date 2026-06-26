@@ -1,0 +1,11 @@
+[Unit]
+Description=SallyNet media ingest — nightly drain of the upload inbox
+
+[Timer]
+# 02:00 local; Persistent catches up the run if Sally was powered off at the scheduled time.
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

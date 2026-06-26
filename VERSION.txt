@@ -1,6 +1,16 @@
-0.3.0
+0.4.0
 
 ## Changelog
+
+### 0.4.0 (2026-06-26)
+- **Home-media subsystem — built, deployed, and verified live on Camperoku.** Browse/play home-made camping trips + photos on the Roku, served from the HDD via `sally-api`.
+- Encode-once "gold standard": MP4 H.264 High@L4.2, ≤1080p downscale-only, CFR, 2 s GOP, CRF 20 + 12 Mbps cap, AAC 192k, `+faststart` (verified by `ffprobe` on a real Pi encode). Codec config-switchable for HEVC on the N100.
+- New pipeline (`scripts/` → `/opt/sally/media/`): `media-ingest.sh` (filesystem queue, sha256 dedup, atomic publish, rollback-on-fail), `media-encode-video/photo.sh`, `media-extract-meta.py` (exiftool + geotag chain: embedded GPS → GPX breadcrumb correlation), `media-track-logger.py` (gpsd→GPX on SD), `media-reindex.py`, `media-worker-remote.sh` (laptop offload). systemd: always-on track logger + nightly idle-prio encode timer (won't fight RetroPie). HDD tree `/mnt/usb/home/`.
+- `sally-api` extended (additive to the frozen v1 contract): `/api/media?type=trips`, `/api/collections/<id>`, `/api/photos`, `/media/<path>` (HTTP Range 206), `/api/qr.png`, `/api/upload` + `/upload` mobile page; served under waitress. Per-item sidecars = source of truth; `catalog.json` + breadcrumbs on the Pi SD card.
+- Guest upload: QR on the Roku Photos screen → phone upload page (camera roll, optional name/trip/GPS) → inbox → encodes overnight.
+- New Roku screens: Media (RowList rows-as-trips), `VodPlayer` (trick play + resume bookmark + watchdog, EOF→back), PhotoGallery (slideshow), QrScreen; Media + Photos tiles enabled.
+- ⚠️ HDD bad sector found (Seagate ST1000LM037, unrecovered read error) — localized; decision: leave-as-is + monitor; mitigated by relocating catalog/tracks to SD. See `docs/current-state.md`.
+- Platform decision: stay on Pi Buster for now (version-aware ffmpeg 4.1 / Py3.7 workarounds); modern stack lands on the N100 at Phase 3.
 
 ### 0.3.0 (2026-06-26)
 - **Phase 0 of the SallyNet glass dashboard — built, sideloaded, and verified live on Camperoku** (renders live drive data; other tabs are placeholders).

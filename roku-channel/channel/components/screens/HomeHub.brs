@@ -5,11 +5,11 @@ sub init()
 
     defs = [
         { label: "Drive",   route: "drive",   enabled: true },
+        { label: "Media",   route: "media",   enabled: true },
+        { label: "Photos",  route: "photos",  enabled: true },
         { label: "Camp",    route: "camp",    enabled: false },
-        { label: "Media",   route: "media",   enabled: false },
         { label: "Cameras", route: "cameras", enabled: false },
-        { label: "Systems", route: "systems", enabled: false },
-        { label: "Photos",  route: "photos",  enabled: false }
+        { label: "Systems", route: "systems", enabled: false }
     ]
     for each d in defs
         tile = createObject("roSGNode", "NavTile")

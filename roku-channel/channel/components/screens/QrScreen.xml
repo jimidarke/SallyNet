@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- QrScreen — shows /api/qr.png so guests on SallyNet WiFi scan it to open the upload
+     page. White quiet-zone card behind the code for scannability. Back returns. -->
+<component name="QrScreen" extends="Group" initialFocus="sink">
+    <interface>
+        <field id="requestBack" type="boolean" value="false" alwaysNotify="true" />
+        <field id="refresh" type="boolean" value="false" alwaysNotify="true" onChange="onRefresh" />
+    </interface>
+    <script type="text/brightscript" uri="QrScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8DCC8FF" />
+        <Rectangle width="1920" height="120" color="0xE8A044FF" />
+        <Rectangle translation="[0, 120]" width="1920" height="5" color="0xC8462EFF" />
+        <Rectangle translation="[0, 125]" width="1920" height="5" color="0xE8702EFF" />
+        <Label translation="[60, 36]" color="0x2B2A26FF" font="font:LargeBoldSystemFont"
+               text="Send Us Your Photos" />
+
+        <!-- white quiet-zone card + QR -->
+        <Rectangle translation="[680, 300]" width="560" height="560" color="0xFFFFFFFF" />
+        <Poster id="qr" translation="[700, 320]" width="520" height="520"
+                loadDisplayMode="scaleToFit" />
+
+        <Label translation="[460, 900]" width="1000" horizAlign="center"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont"
+               text="1. Join Wi-Fi: SallyNet     2. Scan with your phone camera     3. Pick photos &amp; videos" />
+        <Rectangle id="sink" width="1" height="1" color="0x00000000" />
+    </children>
+</component>

@@ -26,16 +26,51 @@ What to reuse:
 - Overlay layer (PIP, text, weather, sensor zones)
 - Registry caching pattern for fast cold-start
 
-What to change (~200–300 LOC per the rokuApp explore):
-- Replace `DiscoveryTask` (SSDP) with fixed mini-PC IP / mDNS (`sally.local`)
-- **Mini-PC** (not Pi — see `subsystems/compute/` for the v0.2.0 host decision) exposes `GET /api/media?type=movies|photos` → JSON manifest + file URLs
-- Point `LiveGroup` source at the mini-PC's file URLs instead of camera streams
-- Add Netflix / YouTube deep-link tiles via ECP `/launch/<channelId>?contentId=…`
+What changed (realized in Phase 1, below):
+- Replaced `DiscoveryTask` (SSDP) with the fixed `sally-api` base URL (registry `apiBase`, default `http://192.168.2.216:8090`; overridable by ECP deep-link). No mDNS — the LAN IP is canonical.
+- The backend exposes `GET /api/media?type=trips` + `GET /api/collections/<id>` + `GET /api/photos` + `GET /media/<path>` (HTTP Range) — on the **Pi today** (`sally-api`), migrating to the N100 at Phase 3 via a base-URL change.
+- `VodPlayer` (adapted from `LiveGroup`) plays the `/media/<path>` MP4s instead of camera streams.
+- Netflix / YouTube deep-link tiles via ECP `/launch/<channelId>?contentId=…` — still to do.
 
-Code lives in a **separate forked repo**, not in this folder. This folder only holds:
-- Deploy notes (sideload IP, dev password reminder, build/test cheatsheet)
-- Channel config exports
-- Screenshots / UX notes
+The channel code now lives **in this monorepo at `roku-channel/`** (consolidated 2026-06-26), not a separate repo. This folder holds the deploy/integration notes, the frozen `api-contract.md`, and UX notes.
+
+## Phase 1 — Home media (trips / photos) · BUILT (2026-06-26)
+
+Home-made content (camping trips, family memories, drone footage) is browsable + playable on the
+Roku, served from the HDD via `sally-api`. Verified end-to-end on Camperoku (encode → catalog →
+API → channel renders the catalog, no errors).
+
+**One optimal format, encode-once** (the "gold standard"): MP4 H.264 **High@L4.2**, ≤1080p
+downscale-only (AR preserved, never upscaled), **CFR**, 2 s GOP, **CRF 20 + 12 Mbps cap**, AAC-LC
+192k/48k, **`+faststart`** (moov first — mandatory for Roku progressive). Photos: ≤1080p sRGB JPEG
+q85 + 480×270 thumbs. Codec is config-switchable (H.265 later on the N100). Confirmed by `ffprobe`
+on a real Pi encode.
+
+**Pipeline** (`scripts/` → deployed to `/opt/sally/media/` on the Pi):
+- `media-ingest.sh` — filesystem-as-queue worker: atomic claim (`mv inbox→work`), sha256 dedup,
+  route to trip/drone/unsorted, encode, publish atomically, write per-item sidecar, reindex,
+  rollback-to-`failed/` on error. Modes `--once` (nightly) / `--watch` / `--batch` / `--reclaim`.
+- `media-encode-video.sh` / `media-encode-photo.sh` — the gold-standard ffmpeg / ImageMagick encode
+  (version-aware for the Pi's ffmpeg 4.1: `-vsync cfr`, `trunc(iw/2)*2` instead of `force_divisible_by`).
+- `media-extract-meta.py` — exiftool + geotag chain (embedded GPS → GPX breadcrumb correlation → omit) → sidecar JSON.
+- `media-track-logger.py` — gpsd → daily GPX breadcrumbs (SD card, `/var/lib/sally/tracks`).
+- `media-reindex.py` — rebuild `catalog.json` read-model from sidecars (flock-guarded, on SD).
+- `media-worker-remote.sh` — rsync-offload the heavy encoding to a laptop over SSH/WireGuard.
+- systemd: `media-track-logger.service` (always-on) + `media-encode.timer` (02:00, `Nice=15` +
+  idle CPU/IO so it never fights RetroPie). Config `configs/media/sally-media.conf`; deploy with
+  `scripts/deploy-media-worker.sh`.
+
+**Storage:** `/mnt/usb/home/{inbox,work,library/{trips,drone,memories,unsorted},originals,catalog/items,failed,logs}`.
+Per-item sidecars (HDD) are the source of truth; `catalog.json` + breadcrumbs live on the Pi's SD
+card — crash-safe, and it dodges a **bad sector found on the HDD** (see `docs/current-state.md`).
+
+**Guest upload:** `GET /upload` (mobile page) + `POST /api/upload` stream files into `inbox/`; the
+Roku **Photos → Info** shows `GET /api/qr.png`, so guests on SallyNet scan → upload from their phone
+(camera roll, optional name/trip, optional phone-GPS). Files encode on the next nightly run.
+
+**Roku screens:** Media (RowList, one row per trip) → `VodPlayer` (trick play + resume bookmark +
+watchdog, EOF→back); Photos (two-poster slideshow + date/place overlay); `QrScreen`. Surface frozen
+in `api-contract.md`.
 
 ## Bonus idea: live backup-cam → Roku with GPS map overlay (rolling)
 
@@ -58,14 +93,17 @@ Caveats:
 
 ## Roadmap
 
-1. ✅ Forked rokuApp into `sallyNet-channel` (separate repo); rebranded **SallyNet** (sunset palette + mascot).
-2. Stand up the **mini-PC** media HTTP service (cross-link: `subsystems/compute/` for the host decision).
-3. Strip HouseWall's camera-specific overlays; replace with movie metadata + photo gallery views for the VOD path.
+1. ✅ Forked rokuApp; consolidated into `roku-channel/`; rebranded **SallyNet** (sunset palette + mascot).
+2. ✅ Media HTTP service stood up on the **Pi** (`sally-api` `/api/media` + `/media`) — moves to the N100 at Phase 3 (`subsystems/compute/`).
+3. ✅ Built the home-media VOD + photo path (Media RowList, `VodPlayer`, PhotoGallery) — no camera-overlay cruft.
 4. ✅ First sideload to Camperoku — verified live (polls `/api/state`, auto-routes Splash→Home→Drive).
-5. Add deep-link tile for Netflix.
+5. Add deep-link tile for Netflix / YouTube.
 6. **Driving mode** — composite-capture the backup-cam head into the mini-PC → LAN stream → Roku channel `LiveGroup` tile + GPS overlay.
-7. Retire (or relegate) the AGPtek mini 1080 once the SallyNet channel handles local files cleanly (Phase 1).
+7. Retire (or relegate) the AGPtek mini 1080 now that the SallyNet channel handles local files (Phase 1 ✅).
 
 ## Next action
 
-Phase 1 (Media): build `sally-api` `/api/media` (encode-once H.264 MP4 + faststart over HTTP Range) and the SallyNet **Media** screen; retire MiniDLNA for the Roku path; add Netflix/YouTube ECP deep-link tiles.
+Phase 1 (Media) is **built + verified live**. Next: load real trip content (drop into
+`/mnt/usb/home/inbox/` or via the QR upload page → encodes on the nightly run), add Netflix/YouTube
+ECP deep-link tiles, and optionally wire `type=movies|tv|kids` so the Roku can also browse the
+existing MiniDLNA movie/TV library. Then Phase 2 (Camp/Systems sensors via MQTT).
