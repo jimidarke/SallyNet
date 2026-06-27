@@ -2,16 +2,18 @@
 name: sallynet-pi-ops
 description: >-
   Deploy to and maintain campingpi — the Raspberry Pi 3B+ that hosts all of
-  SallyNet's always-on services (the sally-api Flask app, gpsd, mosquitto, the
-  media pipeline, the LTE monitor, the WireGuard site node). Use this whenever
-  the task is to push/deploy/update code to the Pi, restart or check a Sally
-  service, tail its logs, run the media or telemetry pipeline, preseed map tiles,
-  or do Pi maintenance — anything touching campingpi, /opt/sally, /var/lib/sally,
-  or the scripts/deploy-*.sh scripts. Trigger on phrasings like "push my sally-api
-  change", "redeploy the map service", "the encode timer isn't running", "tail
-  the api logs", "preseed tiles for our trip", "restart gpsd". This skill is
-  action-enabling: it will run deploys/restarts, but ALWAYS after the preflight
-  safety checks below.
+  SallyNet's always-on services (the sally-api Flask app on :8090, gpsd,
+  mosquitto, the media + telemetry pipeline, the LTE monitor, the WireGuard site
+  node). Use whenever the task is to push, deploy, or update code to the Pi,
+  restart/enable/check a Sally service, tail its logs, run the media or telemetry
+  pipeline, preseed map tiles, or do Pi maintenance — anything touching
+  campingpi, /opt/sally, /var/lib/sally, or the scripts/deploy-*.sh scripts.
+  Trigger on phrasings like "push my sally-api change", "redeploy the map
+  service", "the encode timer isn't running", "tail the api logs", "preseed tiles
+  for our trip", "restart gpsd". Action-enabling — it runs deploys and restarts,
+  but always after the preflight safety checks. For the tunnel, router, or
+  reachability from home, use sallynet-networking; for what the API serves users,
+  use sallynet-interfaces.
 ---
 
 # SallyNet Pi ops — deploy + maintain campingpi

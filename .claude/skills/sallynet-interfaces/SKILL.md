@@ -1,18 +1,19 @@
 ---
 name: sallynet-interfaces
 description: >-
-  How people actually USE SallyNet — the human-facing surface of Sally the
-  motorhome. Use this whenever the task is about a user interaction: the phone
-  web pages on SallyNet WiFi (the QR photo-upload page, the mileage/fuel logger,
-  the trip-entry form, the waypoint editor, the browser map), the Roku channel
-  screens guests see on the TV, how an uploaded photo travels to the screen, or
-  the planned ways people will interact next — RF/amateur-radio headsets, the
-  ESP32 sensor/control nodes (cabin env, tanks, power, the driver-door fuel
-  keypad, the back-seat "are we there yet?" button), and WLED ambient lighting.
-  Trigger on "how do guests add photos", "the fuel/mileage website", "log a
-  fill-up", "set up a trip on the dashboard", "what screens are on the Roku",
-  "the camper-to-camper radios", "the back-seat ETA button". This is the frozen
-  /api contract + UX orientation layer.
+  How people actually USE SallyNet — the human-facing surface and the frozen
+  :8090 API. Use for any user-interaction task: the phone web pages on SallyNet
+  WiFi (the QR photo-upload page, the mileage/fuel logger, the trip-entry form,
+  the waypoint editor, the browser map), the Roku channel screens guests see on
+  the TV, how an uploaded photo travels to the screen, the /api contract itself,
+  or the planned interactions — RF/amateur-radio voice, the ESP32 sensor/control
+  nodes (cabin env, tanks, power, the driver-door fuel keypad, the back-seat "are
+  we there yet?" button), and WLED lighting. Trigger on "how do guests add
+  photos", "the fuel/mileage website", "log a fill-up", "set up a trip on the
+  dashboard", "what screens are on the Roku", "the camper-to-camper radios", "the
+  back-seat ETA button". For deploying or operating the Pi host, use
+  sallynet-pi-ops; for the LAN, tunnel, or router, use sallynet-networking; for
+  BrightScript/SceneGraph channel engineering, use RokuAppDev.
 ---
 
 # SallyNet interfaces — how people use Sally

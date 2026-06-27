@@ -31,5 +31,5 @@ Each folder under `subsystems/` covers one functional area. Each one has a READM
 
 - Roadmap and rationale live in [docs/](docs/) and each subsystem README.
 - Bash scripts use `set -euo pipefail` and the shared helper style from sibling project `gameBox`.
-- Roku channel source lives in its own forked repo, not here — `subsystems/media/` only holds deploy + integration notes.
+- Roku channel source lives at [`roku-channel/`](roku-channel/) in this monorepo (forked from `rokuApp/HouseWall`, consolidated 2026-06-26) — `subsystems/media/` holds the deploy + integration notes and the frozen `/api` contract.
 - **Propane system is read-only.** No hobbyist modification of tank, regulator, lines, or hoses. See [`subsystems/tanks/README.md`](subsystems/tanks/README.md) for what is and isn't fair game.

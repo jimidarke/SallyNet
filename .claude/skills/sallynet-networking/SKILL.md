@@ -1,16 +1,17 @@
 ---
 name: sallynet-networking
 description: >-
-  The complete networking picture for SallyNet — Sally the motorhome's rolling
-  network. Use this whenever the task touches connectivity: the WireGuard/VPN
-  tunnel home, reaching the Pi/router/Roku remotely from the WSL dev box, IP
-  addressing or the LAN schema, the QX210-NW2 cellular router or its LuCI web UI,
-  the LTE/cell uplink and bandwidth/signal telemetry, the Pi↔router RS232 serial
-  link, or which nodes exist and are planned. Trigger even when the user doesn't
-  say "network" — e.g. "I can't reach the Pi from home", "why is streaming
-  choppy", "what's Sally's router IP", "bring up the tunnel", "is the modem
-  online". This is the source-of-truth orientation layer so you don't re-derive
-  the topology every session.
+  SallyNet's networking and remote-access reference — how Sally the motorhome's
+  rolling LAN is wired and how to reach it. Use for any connectivity or
+  remote-access task: the WireGuard/VPN tunnel home, reaching the Pi, router, or
+  Roku remotely from the WSL dev box, IP addressing and the LAN schema, the
+  QX210-NW2 cellular router and its LuCI web UI, the LTE uplink and its
+  signal/bandwidth telemetry, the Pi↔router RS232 link, or which nodes exist and
+  are planned. Trigger even without the word "network" — e.g. "I can't reach the
+  Pi from home", "bring up the tunnel", "why is streaming choppy", "what's
+  Sally's router IP", "is the modem online". For deploying or restarting services
+  on the Pi, use sallynet-pi-ops; for the :8090 API and the user-facing web/Roku
+  UIs, use sallynet-interfaces.
 ---
 
 # SallyNet networking
