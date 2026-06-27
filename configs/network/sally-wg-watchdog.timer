@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the SallyNet WireGuard watchdog every minute
+
+[Timer]
+# Fire 60s after boot (gives the QX210 a head start on LTE), then every 60s.
+OnBootSec=60
+OnUnitActiveSec=60
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

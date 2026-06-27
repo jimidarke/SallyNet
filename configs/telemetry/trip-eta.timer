@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh the SallyNet trip ETA every 60s
+
+[Timer]
+# Fire 90s after boot (let sally-api + gpsd settle), then every 60s. The script
+# itself no-ops cheaply when there's no active trip, so a fixed cadence is fine.
+OnBootSec=90
+OnUnitActiveSec=60
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

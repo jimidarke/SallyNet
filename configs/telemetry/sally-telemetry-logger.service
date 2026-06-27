@@ -1,0 +1,20 @@
+[Unit]
+Description=SallyNet telemetry logger (MQTT -> daily JSONL)
+Documentation=https://github.com/ (sallyNet: subsystems/telemetry/README.md)
+After=network-online.target mosquitto.service
+Wants=network-online.target mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+Environment=OUTDIR=/var/lib/sally/telemetry
+Environment=RETAIN_DAYS=90
+ExecStart=/opt/sally/telemetry/telemetry-logger.sh
+# mosquitto_sub exits if the broker drops or won't accept the connection; just
+# keep reconnecting until it's back.
+Restart=always
+RestartSec=5
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

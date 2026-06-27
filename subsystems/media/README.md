@@ -38,7 +38,13 @@ The channel code now lives **in this monorepo at `roku-channel/`** (consolidated
 
 Home-made content (camping trips, family memories, drone footage) is browsable + playable on the
 Roku, served from the HDD via `sally-api`. Verified end-to-end on Camperoku (encode → catalog →
-API → channel renders the catalog, no errors).
+API → channel renders the catalog, no errors) — that pass used a **generated test image**
+(artifacts since cleaned up, so the catalog currently reads 0/0).
+
+> **⚠️ 2026-06-26 — happy path now blocked on storage.** The first ingest of a *real* guest
+> upload failed: the HDD's bad band degraded to **write faults** and `library/unsorted/` is on
+> it. The pipeline failed safe (photo preserved in `home/failed/`). Back up + replace/format the
+> drive before re-verifying. Full diagnosis: `hdd-failure-2026-06-26.md`.
 
 **One optimal format, encode-once** (the "gold standard"): MP4 H.264 **High@L4.2**, ≤1080p
 downscale-only (AR preserved, never upscaled), **CFR**, 2 s GOP, **CRF 20 + 12 Mbps cap**, AAC-LC

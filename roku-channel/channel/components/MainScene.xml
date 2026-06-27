@@ -18,6 +18,7 @@
         <SplashScreen id="splash" />
         <HomeHub id="home" visible="false" />
         <DriveScreen id="drive" visible="false" />
+        <CampScreen id="camp" visible="false" />
         <MediaScreen id="media" visible="false" />
         <VodPlayer id="vod" visible="false" />
         <PhotoGallery id="photos" visible="false" />

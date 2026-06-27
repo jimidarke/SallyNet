@@ -1,6 +1,16 @@
-0.4.0
+0.5.0
 
 ## Changelog
+
+### 0.5.0 (2026-06-27)
+- **Trip entry + 4-state GPS mode + fuel logger — built and verified (Flask test-client end-to-end).** Closes `mastertodo.md` C2 + C3.
+- New `/trip` mobile page + `GET/POST /api/trip`: enter destination, who's aboard, dates. Destination geocoded via OSM Nominatim over LTE with a "pin current GPS" offline fallback. Active trip stored atomically on the SD card (`/var/lib/sally/trips.json`) — feeds (a) the new `camping` geofence, (b) the Drive/Camp screens, (c) the media collection (surfaced in `/api/media?type=trips` instantly; `media-reindex.py:load_trip_meta` reconciles SD store over the failing-HDD `trip.json`).
+- New 4th mode `camping` in `_derive_mode` (active-trip destination geofence); home radius 150→1000 m, driving 8→10 km/h. Additive `trip` + `fuel` sections in `/api/state` (omit-not-null preserved).
+- OSRM road-route ETA out-of-band: `scripts/trip-eta-refresh.py` (60 s `trip-eta.timer`) caches `route.json`; `/api/state` stays network-free and degrades to straight-line `km_to_dest` + a staleness flag in dead zones.
+- New `/fuel` mobile page (native numeric keypad) + `POST /api/fuel-log`: odometer/litres/$-per-litre, GPS-UTC timestamp + location auto-stamped; computes per-tank L/100km + mpg(imp); dual sink `fuel-log.json` (SD) + `docs/fuel-log.md`.
+- New shared `services/sally-api/store.py` (atomic flock writes + mtime-cached reads + slug); Roku: `camping→camp` routing, new `CampScreen`, Camp tile enabled, Drive screen To/ETA/Aboard + fuel-avg footer. `bsc` lint clean.
+- **LTE + telemetry monitoring (parallel workstream landed):** `scripts/lte-monitor.py` (QX210 wwan0 signal/bandwidth → MQTT), `wg-watchdog.sh` (WireGuard handshake recovery), `telemetry-logger.sh`, with deploy scripts + systemd units under `configs/{network,telemetry}/`; `subsystems/network/lte-monitoring.md` + `remote-access-vpn.md`. (ESPHome `cabin-temp-humidity.yaml` kept local — see `.security-ignored`.)
+- Maps / waypoints / POIs deferred to its own spec (`subsystems/gps/map-navigation-brainstorm.md`); offline OSM tile cache needs research.
 
 ### 0.4.0 (2026-06-26)
 - **Home-media subsystem — built, deployed, and verified live on Camperoku.** Browse/play home-made camping trips + photos on the Roku, served from the HDD via `sally-api`.

@@ -28,6 +28,11 @@
         <Label id="r3" translation="[1080, 452]" width="780" color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
         <Label id="r4" translation="[1080, 528]" width="780" color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
 
+        <!-- trip column (left, under hero) — only populated when a trip is active -->
+        <Label id="r5" translation="[120, 520]" width="900" color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+        <Label id="r6" translation="[120, 596]" width="900" color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+        <Label id="r7" translation="[120, 672]" width="900" color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+
         <Label id="footer" translation="[60, 1006]" width="1800"
                color="0x2B2A26AA" font="font:SmallSystemFont" text="" />
     </children>

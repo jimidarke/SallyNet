@@ -32,6 +32,18 @@ References:
 2. ✅ Exposed to the dashboard — `sally-api` `/api/state` reads gpsd; the SallyNet Roku channel polls it.
 3. (optional) Traccar for family location sharing — check the `homeController` estate for an instance, or skip in favour of the in-rig dashboard.
 
+## Mode derivation (4-state, 2026-06-27)
+
+`sally-api` derives an instantaneous **mode** from the GPS fix + the active trip:
+`driving` (speed ≥ 10 km/h) → `at_home` (within 1 km of the home anchor) → `camping`
+(stopped within 250 m of the **active trip's destination** — set via the `/trip` entry
+page) → else `parked`. The Roku auto-routes Home ⇄ Drive ⇄ Camp on this with a short
+hysteresis. Thresholds are env-tunable (`SALLY_DRIVING_KMH`, `SALLY_HOME_RADIUS_M`,
+`SALLY_DEST_RADIUS_M`). See `subsystems/media/api-contract.md`.
+
 ## Next action
 
-gpsd is live. GPS is done for the dashboard: `gpsd` is live and exposed via `sally-api` `/api/state`, which the SallyNet Roku channel polls every ~5 s. (Traccar for family location sharing stays a parallel option — check the `homeController` estate for an existing instance.)
+gpsd is live and feeds the 4-state mode machine + trip ETA. **Maps/waypoints/POIs is the
+next GPS-adjacent push** — needs its own spec (offline OSM tile cache for dead zones;
+`/api/map.png` is already reserved). Traccar family location sharing stays a parallel
+option (check the `homeController` estate for an existing instance).

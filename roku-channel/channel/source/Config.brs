@@ -19,7 +19,12 @@ function SN_SCRIM()  as string : return "0x2B2A26E6" : end function
 function SN_API_BASE_DEFAULT() as string : return "http://192.168.2.216:8090" : end function
 
 ' --- Mode hint threshold -------------------------------------------------
-function SN_DRIVING_KMH() as integer : return 8 : end function
+' Mirrors sally-api SALLY_DRIVING_KMH (mode is server-derived; this is for any
+' client-side display/threshold use). Keep in sync with sallyconf.py.
+function SN_DRIVING_KMH() as integer : return 10 : end function
+
+' ETA older than this (seconds) is shown as stale on the Drive screen.
+function SN_ETA_STALE_S() as integer : return 600 : end function
 
 ' --- Registry ------------------------------------------------------------
 function SN_REG_SECTION()    as string  : return "sallynet" : end function
@@ -170,4 +175,31 @@ function snDateLabelFromIso(iso as dynamic) as string
     mi = Mid(s, 6, 2).toInt()
     if mi < 1 or mi > 12 then return s
     return months[mi] + " " + Mid(s, 9, 2).toInt().toStr() + ", " + Mid(s, 1, 4)
+end function
+
+' Epoch (UTC seconds, e.g. trip.eta) -> "2h 05m" / "12m" / "now" remaining. Timezone-
+' free: works off the delta to the Roku's own clock, so no TZ guessing needed.
+function snEtaRemaining(epoch as dynamic) as string
+    if epoch = invalid then return "--"
+    secs = snParseInt(epoch) - snNowSeconds()
+    if secs <= 0 then return "now"
+    mins = secs \ 60
+    h = mins \ 60
+    mm = mins mod 60
+    if h > 0 then return h.toStr() + "h " + pad2(mm) + "m"
+    return mm.toStr() + "m"
+end function
+
+' "YYYY-MM-DD..." start date -> day number of the trip (1-based), 0 if unknown/future.
+function snDaysSinceIso(iso as dynamic) as integer
+    if iso = invalid then return 0
+    s = iso.toStr()
+    if Len(s) < 10 then return 0
+    d = createObject("roDateTime")
+    d.FromISO8601String(Left(s, 10) + "T12:00:00Z")
+    startSec = d.AsSeconds()
+    if startSec <= 0 then return 0
+    diff = snNowSeconds() - startSec
+    if diff < 0 then return 0
+    return (diff \ 86400) + 1
 end function

@@ -4,6 +4,7 @@ sub init()
     m.splash = m.top.findNode("splash")
     m.home = m.top.findNode("home")
     m.drive = m.top.findNode("drive")
+    m.camp = m.top.findNode("camp")
     m.media = m.top.findNode("media")
     m.vod = m.top.findNode("vod")
     m.photos = m.top.findNode("photos")
@@ -84,6 +85,7 @@ sub routeState(s as object)
     m.lastState = s
     m.home.state = s
     m.drive.state = s
+    m.camp.state = s
     applyMode(s)
 end sub
 
@@ -122,13 +124,14 @@ end sub
 
 function routeForMode(mode as string) as string
     if mode = "driving" then return "drive"
+    if mode = "camping" then return "camp"
     if mode = "at_home" then return "home"
-    if mode = "parked" then return "home"   ' Camp screen arrives in P2
+    if mode = "parked" then return "home"   ' generic stop -> hub
     return ""
 end function
 
 function isPassive(route as string) as boolean
-    return route = "home" or route = "drive"
+    return route = "home" or route = "drive" or route = "camp"
 end function
 
 sub go(route as string)
@@ -138,6 +141,7 @@ sub go(route as string)
     m.splash.visible = (route = "splash")
     m.home.visible = (route = "home")
     m.drive.visible = (route = "drive")
+    m.camp.visible = (route = "camp")
     m.media.visible = (route = "media")
     m.vod.visible = (route = "vod")
     m.photos.visible = (route = "photos")
@@ -148,6 +152,8 @@ sub go(route as string)
         m.home.setFocus(true)
     else if route = "drive" then
         m.drive.setFocus(true)
+    else if route = "camp" then
+        m.camp.setFocus(true)
     else if route = "media" then
         m.media.setFocus(true)
     else if route = "photos" then
@@ -167,6 +173,7 @@ function routeParent(route as string) as string
     if route = "photos" then return "home"
     if route = "qr" then return m.qrParent
     if route = "drive" then return "home"
+    if route = "camp" then return "home"
     return "home"
 end function
 
@@ -179,6 +186,8 @@ sub onHomeSelect()
     end if
     if r = "drive" then
         go("drive")
+    else if r = "camp" then
+        go("camp")
     else if r = "media" then
         m.list.control = "RUN"
         go("media")

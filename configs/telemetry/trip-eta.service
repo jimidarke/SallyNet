@@ -1,0 +1,13 @@
+[Unit]
+Description=SallyNet trip ETA refresher (OSRM road route -> route.json cache)
+After=network-online.target sally-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+# Override OSRM/route paths here if self-hosting OSRM on the N100:
+# Environment=OSRM_URL=http://10.66.12.x:5000/route/v1/driving
+ExecStart=/usr/bin/python3 /opt/sally/media/trip-eta-refresh.py
+# Gentle — a single short HTTP call; never compete with gpsd/sally-api.
+Nice=10

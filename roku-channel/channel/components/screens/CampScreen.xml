@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- CampScreen — shown while parked at the active trip's destination (mode=camping).
+     Reads /api/state.trip + .gps + .drive. -->
+<component name="CampScreen" extends="Group">
+    <interface>
+        <field id="state" type="assocarray" onChange="onState" />
+    </interface>
+    <script type="text/brightscript" uri="CampScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8DCC8FF" />
+
+        <!-- header band + twin stripe -->
+        <Rectangle width="1920" height="96" color="0xE8A044FF" />
+        <Rectangle translation="[0, 96]"  width="1920" height="5" color="0xC8462EFF" />
+        <Rectangle translation="[0, 101]" width="1920" height="5" color="0xE8702EFF" />
+        <Label translation="[60, 26]" color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="CAMP" />
+        <Label id="clock" translation="[1440, 26]" width="420" horizAlign="right"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+
+        <!-- hero: where we're camped -->
+        <Label translation="[120, 220]" color="0x2B2A26AA" font="font:MediumBoldSystemFont" text="Camped at" />
+        <Label id="place" translation="[120, 270]" width="1680"
+               color="0x2B2A26FF" font="font:LargeBoldSystemFont" text="--" />
+        <Label id="sub" translation="[120, 400]" width="1680"
+               color="0x2B2A26AA" font="font:MediumBoldSystemFont" text="" />
+
+        <!-- who's aboard -->
+        <Label translation="[120, 540]" color="0x2B2A26AA" font="font:MediumBoldSystemFont" text="Who's aboard" />
+        <Label id="aboard" translation="[120, 590]" width="1680"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+
+        <!-- right column facts -->
+        <Label id="fromhome" translation="[120, 720]" width="1680"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+        <Label id="gps" translation="[120, 784]" width="1680"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+
+        <Label id="footer" translation="[60, 1006]" width="1800"
+               color="0x2B2A26AA" font="font:SmallSystemFont" text="" />
+    </children>
+</component>

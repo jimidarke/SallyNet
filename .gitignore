@@ -22,3 +22,6 @@ node_modules/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# git-it acknowledged-secrets ledger (do not publish)
+.security-ignored

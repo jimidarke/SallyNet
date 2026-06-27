@@ -5,6 +5,9 @@ sub init()
     m.r2 = m.top.findNode("r2")
     m.r3 = m.top.findNode("r3")
     m.r4 = m.top.findNode("r4")
+    m.r5 = m.top.findNode("r5")
+    m.r6 = m.top.findNode("r6")
+    m.r7 = m.top.findNode("r7")
     m.footer = m.top.findNode("footer")
 end sub
 
@@ -28,6 +31,35 @@ sub onState()
         if drive.km_from_home <> invalid then m.r3.text = "From home " + snFmt1(drive.km_from_home) + " km"
     end if
 
+    ' Trip destination + ETA (only when a trip is active; cleared otherwise).
+    trip = s.trip
+    if trip <> invalid then
+        dn = trip.destName
+        if dn = invalid then dn = trip.title
+        m.r5.text = "To        " + asStr(dn)
+        if trip.eta <> invalid then
+            etaTxt = snEtaRemaining(trip.eta)
+            if trip.etaStaleSec <> invalid and trip.etaStaleSec > SN_ETA_STALE_S() then
+                etaTxt = etaTxt + " (old)"
+            end if
+            m.r6.text = "ETA       " + etaTxt
+        else if trip.km_to_dest <> invalid then
+            m.r6.text = "To go     " + snFmt1(trip.km_to_dest) + " km"
+        else
+            m.r6.text = ""
+        end if
+        if trip.aboard <> invalid then m.r7.text = "Aboard    " + trip.aboard.count().toStr()
+    else
+        m.r5.text = ""
+        m.r6.text = ""
+        m.r7.text = ""
+    end if
+
     m.clock.text = snClockHM()
-    m.footer.text = "mode=" + asStr(s.mode) + "   refreshed " + snClockHMS()
+    foot = "mode=" + asStr(s.mode) + "   refreshed " + snClockHMS()
+    fuel = s.fuel
+    if fuel <> invalid and fuel.avg_l_100km <> invalid then
+        foot = foot + "   fuel avg " + snFmt1(fuel.avg_l_100km) + " L/100km"
+    end if
+    m.footer.text = foot
 end sub

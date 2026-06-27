@@ -1,0 +1,9 @@
+[Unit]
+Description=SallyNet WireGuard site-node watchdog (re-resolve hub DDNS + handshake recovery)
+After=network.target
+# Best-effort tie to the tunnel unit; the watchdog also (re)starts it if it's down.
+Wants=wg-quick@wg-home.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/sally/net/wg-watchdog.sh

@@ -1,0 +1,79 @@
+esphome:
+  name: sally-01
+  friendly_name: sally-01
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino 
+    #esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+#api:
+#  encryption:
+#    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# --- Connectivity -----------------------------------------------------------
+wifi:
+  ssid: SallyNet
+  password: !secret wifi_password
+  # Fallback hotspot if SallyNet is unreachable (e.g. router rebooting)
+  ap:
+    ssid: sally-cabin-temp-setup
+    password: !secret ap_password
+
+captive_portal:
+
+
+mqtt:
+  broker: 192.168.2.216               # mosquitto on campingpi (Phase-0 stopgap; no auth, on-LAN). Repoint to the N100 when it lands.
+  port: 1883
+  # No username/password — broker is anonymous on-LAN only.
+  topic_prefix: sally/telemetry/cabin
+  discovery: true                     # Home Assistant auto-discovery when the broker is bridged home
+  birth_message:
+    topic: sally/telemetry/cabin/status
+    payload: online
+  will_message:
+    topic: sally/telemetry/cabin/status
+    payload: offline
+
+
+# --- Sensors ----------------------------------------------------------------
+sensor:
+  - platform: dht
+    model: DHT22
+    pin:
+      number: GPIO4
+      mode: 
+        input: true
+        pullup: false   #  ONLY for a 3-pin breakout with onboard pull-up
+    update_interval: 60s
+    temperature:
+      name: Cabin Temperature
+      id: cabin_temperature
+      filters:
+        - sliding_window_moving_average:   # smooth DHT22 jitter; trends > single reads
+            window_size: 5
+            send_every: 5
+    humidity:
+      name: Cabin Humidity
+      id: cabin_humidity
+      filters:
+        - sliding_window_moving_average:
+            window_size: 5
+            send_every: 5
+
+  - platform: wifi_signal
+    name: Cabin Node WiFi RSSI
+    update_interval: 60s
+
+  - platform: uptime
+    name: Cabin Node Uptime

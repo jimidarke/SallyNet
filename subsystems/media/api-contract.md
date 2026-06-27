@@ -27,7 +27,8 @@ Roku code edits.
 | `/api/photos[?collection=<id>]` | GET | **live (P5)** | flat slideshow list |
 | `/api/qr.png` | GET | **live (P5)** | QR encoding the LAN upload URL guests scan |
 | `/api/upload` · `/upload` | POST · GET | **live (P5)** | guest upload endpoint · mobile upload page |
-| `/api/fuel-log` | POST | P2 | ESP32 door logger → appends `docs/fuel-log.md` + SQLite |
+| `/api/trip` · `/trip` | GET·POST · GET | **live (C2)** | trip store (active trip) · create/end trip · mobile trip-entry page |
+| `/api/fuel-log` · `/fuel` | POST · GET | **live (C3)** | log a fill-up → `fuel-log.json` + `docs/fuel-log.md` · mobile fuel-entry page |
 
 ## `/api/state` schema (v1)
 
@@ -41,7 +42,7 @@ sections that are simply absent until their phase lands.
 {
   "schemaVersion": 1,
   "ts": 1750000000,                       // unix seconds (server clock)
-  "mode": "driving|parked|at_home|unknown",// instantaneous HINT; Roku applies hysteresis
+  "mode": "driving|camping|parked|at_home|unknown",// instantaneous HINT; Roku applies hysteresis
   "gps": {                                 // LIVE from gpsd (P0)
     "fix": true, "mode": 3,                // mode: 0/1 none, 2 = 2D, 3 = 3D
     "lat": 53.546100, "lon": -113.493800,
@@ -50,6 +51,19 @@ sections that are simply absent until their phase lands.
     "time": "2026-06-26T06:55:18.000Z"     // gps time (UTC)
   },
   "drive": { "km_from_home": 0.0, "reverse": false },  // odo_km/trip_km omitted until available
+  "trip": {                                // present only when a trip is ACTIVE (C2)
+    "id": "jasper-run", "title": "Jasper Run",
+    "destName": "Jasper, AB", "dest": { "lat": 52.87, "lon": -118.08 },
+    "aboard": ["Jimi", "Alex", "kids"],
+    "dateStart": "2026-07-04", "dateEnd": "2026-07-07",
+    "km_to_dest": 142.0,                   // haversine, ALWAYS present (offline-safe)
+    "eta": 1751650000, "roadKm": 320.5,    // OSRM cache (arrival unix s) — omitted if no fix/cache
+    "etaSource": "osrm", "etaStaleSec": 47 // age of the cached ETA; Roku flags it stale > 600 s
+  },
+  "fuel": {                                // present only once a fill-up is logged (C3)
+    "last": { "date": "...", "odo_km": 142400.0, "litres": 88.0, "total": 136.4, "l_100km": 22.0 },
+    "avg_l_100km": 21.4, "fills": 7
+  },
   "alerts": [],                            // [{ kind, sev, text, ts }]
   "system": { "host": "campingpi", "uptime_s": 0, "throttled": "0x0" }
   // --- omitted until populated (never sent as null) ---
@@ -67,9 +81,17 @@ sections that are simply absent until their phase lands.
   (degrees true); omitted when stationary or no fix.
 - `drive.km_from_home` is haversine to the saved home anchor (default Edmonton
   `53.5461,-113.4938`, radius 150 m). Configurable via `SALLY_HOME_LAT/LON/RADIUS_M`.
-- `mode` is an instantaneous hint (`driving` if speed ≥ 8 km/h; `at_home` if within the home
-  radius; else `parked`). The Roku `modeController` owns the real hysteresis (8 km/h ×5 s /
-  <3 km/h ×3 min).
+- `mode` is an instantaneous hint: `driving` if speed ≥ `SALLY_DRIVING_KMH` (10); else `at_home`
+  if within `SALLY_HOME_RADIUS_M` (1000 m); else `camping` if an **active trip** has a destination
+  pin and we're stopped within `SALLY_DEST_RADIUS_M` (250 m); else `parked`. `camping` therefore
+  requires a trip — it cannot be inferred from GPS alone. The Roku `modeController` owns the real
+  hysteresis (≥2 stable polls today; the 8 km/h ×5 s / <3 km/h ×3 min curve is aspirational).
+- `trip` is built from the SD trip store (`/var/lib/sally/trips.json`, written by `/api/trip`).
+  `eta`/`roadKm`/`etaSource`/`etaStaleSec` come from the OSRM cache (`/var/lib/sally/route.json`,
+  refreshed out-of-band by `scripts/trip-eta-refresh.py` every 60 s) — omitted when there's no
+  cached route, leaving `km_to_dest` (straight-line) as the offline fallback.
+- `fuel` is derived from `/var/lib/sally/fuel-log.json`; `l_100km` is per-tank (litres ÷ odometer
+  delta to the previous fill), `avg_l_100km` is the running mean over fills that have one.
 - `system.throttled` is `vcgencmd get_throttled` — the under‑voltage canary surfaced on the
   Systems screen.
 - Sensor blocks (`power`/`tanks`/`env`/`level`/`cameras`/`audio`) are **omitted** until their
@@ -128,7 +150,41 @@ unchanged). The Roku reads `catalog.json` (rebuilt from per‑item sidecars by
 - `captureDatetime` is ISO‑8601 with offset; the Roku formats its own display label.
 - The studio `type=movies|tv|kids` catalog is reserved — currently returns empty `collections`.
 
+## Trip + fuel entry (C2 / C3)
+
+Driver/navigator mobile forms, cloned from the guest‑upload pattern. Both write atomic JSON
+read‑models on the **Pi SD card** (never the failing HDD); `/api/state` folds them into the
+`trip` and `fuel` sections above.
+
+```jsonc
+// POST /api/trip  (form-data) — create/replace the active trip, or end it.
+//   create: title (req), destName?, aboard?(comma list), dateStart?, dateEnd?
+//           pin?=1 + lat?/lon?  → pin current GPS as destination (offline fallback)
+//   end:    end=1               → clears activeTripId
+//   destName is geocoded via Nominatim over LTE; on miss/offline the trip saves without a
+//   pin (camping geofence stays inactive until coords resolve).
+{ "schemaVersion": 1, "ok": true, "id": "jasper-run",
+  "dest": { "lat": 52.87, "lon": -118.08 }, "destReason": null }
+
+// GET /api/trip — the store (the form shows the active trip + offers "End trip")
+{ "schemaVersion": 1, "activeTripId": "jasper-run", "trips": { "jasper-run": { ... } } }
+
+// POST /api/fuel-log  (form-data: odo?, litres(req), price?)  — native numeric keypad
+//   datetime (GPS UTC → server fallback) + lat/lon are stamped server-side.
+{ "schemaVersion": 1, "ok": true,
+  "entry": { "ts": 1751650000, "datetime": "2026-07-04T18:00:00Z", "odo_km": 142400.0,
+             "litres": 88.0, "price_per_l": 1.55, "total_cost": 136.4,
+             "l_100km": 22.0, "mpg_imp": 12.8, "lat": 52.87, "lon": -118.08 } }
+```
+
+- A freshly‑created trip appears in `GET /api/media?type=trips` **immediately** as a zero‑item
+  collection (merged from the trip store), so the upload form's trip picker lists it before any
+  reindex. `scripts/media-reindex.py` later reconciles the same store (SD wins over the legacy
+  per‑collection HDD `trips/<cid>/trip.json`).
+
 ## Versioning policy
 Additive fields are non‑breaking (Roku ignores unknown keys). Renames/removals/semantic
 changes bump `schemaVersion` and the Roku `sallyCacheV`. The contract test in the channel
-(`tests/contract/`) validates live `/api/state` against this schema fixture.
+(`tests/contract/`) validates live `/api/state` against this schema fixture. The `mode` enum
+gained `camping` additively — the Roku tolerates unknown mode strings (routes nowhere), so this
+did not bump `schemaVersion`.

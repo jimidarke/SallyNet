@@ -5,6 +5,7 @@ QX210-NW2 Industrial 4G LTE WiFi router is the backbone. WiFi for cabin clients,
 ## Status
 
 - **Working:** Cell uplink; WiFi LAN to Roku + phones; **Pi on wired eth0**. Remote access into the whole LAN via a WireGuard site node on the Pi — see [`remote-access-vpn.md`](remote-access-vpn.md).
+- **LTE monitoring (live):** `wwan0` uplink/downlink bandwidth + modem signal (dBm/CSQ/operator/network) polled from LuCI on the Pi and published to MQTT (HA auto-discovered) — see [`lte-monitoring.md`](lte-monitoring.md). Note: the router exposes **only LuCI on :80** (SSH/dropbear is disabled), so all router scripting goes over HTTP, not SSH.
 - **Pi↔router serial:** no USB-RS232 adapter is actually present — the link will use the Pi's **GPIO UART** (`/dev/serial0`, now enabled). Not yet wired; see [`router-serial-uart.md`](router-serial-uart.md).
 - **Pain points:**
   - Want to auto-switch from cell uplink → WiFi-repeater when home WiFi is in range. Doable on the QX210 but clunky and dated through the web UI.
@@ -12,7 +13,7 @@ QX210-NW2 Industrial 4G LTE WiFi router is the backbone. WiFi for cabin clients,
 
 ## Important: RS232 ≠ console
 
-The QX210 RS232 port is a **data DTU** (raw TCP/UDP passthrough + Modbus RTU↔TCP gateway). It is not a router console. The original "serial = router console override" plan does not work — to script the router from the Pi, use **SSH + UCI** over the LAN. A serial link (Pi GPIO UART, see [`router-serial-uart.md`](router-serial-uart.md)) is only useful for the DTU *data* path, never control.
+The QX210 RS232 port is a **data DTU** (raw TCP/UDP passthrough + Modbus RTU↔TCP gateway). It is not a router console. The original "serial = router console override" plan does not work. **And note (verified 2026-06-26): SSH/dropbear is *disabled* on this router — only LuCI on :80 answers.** So to script the router from the Pi, drive the **LuCI HTTP API** (login → `sysauth` cookie → JSON endpoints), as the LTE monitor does (see [`lte-monitoring.md`](lte-monitoring.md)); or enable dropbear in LuCI first if you want SSH+UCI. A serial link (Pi GPIO UART, see [`router-serial-uart.md`](router-serial-uart.md)) is only useful for the DTU *data* path, never control.
 
 References:
 - [QX210 spec PDF](https://flytec.com.py/download/files/8123%20-%20QX210-Industrial-4G-Cellular-Router-Specification_compressed.pdf)

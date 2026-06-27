@@ -14,12 +14,15 @@ import os
 import re
 import subprocess
 import time
+import urllib.parse
+import urllib.request
 from datetime import datetime
 
 from flask import Flask, Response, abort, jsonify, request, send_file
 from werkzeug.utils import secure_filename
 
 import sallyconf as cfg
+import store
 from gpsd_client import read_fix
 
 app = Flask(__name__)
@@ -86,6 +89,156 @@ document.getElementById('f').onsubmit=function(e){e.preventDefault();
 function show(ok,msg){out.style.display='block';out.className=ok?'ok':'err';out.textContent=msg;}
 </script></body></html>"""
 
+# Driver/navigator trip-entry page (C2). Creates the active trip: its destination drives
+# the "camping" geofence + Drive-screen ETA, and it auto-creates the matching media
+# collection so guest photo uploads route to the right trip from day one.
+_TRIP_HTML = """<!doctype html><html lang=en><head>
+<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Sally — Plan a trip</title><style>
+:root{--g:#d4a017;--r:#c0392b;--o:#e67e22;--ink:#2b2b2b}
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#faf7f0;color:var(--ink)}
+header{background:var(--g);padding:18px 16px;border-bottom:4px solid var(--r)}
+h1{margin:0;font-size:1.25rem}main{padding:16px;max-width:560px;margin:0 auto}
+label{display:block;margin:14px 0 4px;font-weight:600}
+input,button{width:100%;padding:12px;font-size:1rem;border:1px solid #ccc;border-radius:8px}
+button{background:var(--r);color:#fff;border:0;font-weight:700;margin-top:18px}
+button.alt{background:#555;margin-top:10px}button:disabled{opacity:.5}
+.two{display:flex;gap:10px}.two>div{flex:1}
+.row{display:flex;gap:8px;align-items:center;margin-top:10px}.row input[type=checkbox]{width:auto}
+.hint{color:#777;font-size:.85rem;margin-top:4px}
+#cur{background:#eef;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.9rem}
+#out{margin-top:16px;padding:12px;border-radius:8px;display:none}.ok{background:#e8f5e9}.err{background:#fdecea}
+</style></head><body>
+<header><h1>🧭 Plan a trip in Sally</h1></header><main>
+<div id=cur></div>
+<form id=f>
+<label>Trip name</label><input id=title placeholder="e.g. Jasper &amp; the Icefields" required>
+<label>Destination</label><input id=dest placeholder="e.g. Jasper, AB">
+<div class=row><input type=checkbox id=pin><label for=pin style="margin:0;font-weight:400">
+Can't find it / no signal — pin Sally's current GPS as the destination</label></div>
+<label>Who's aboard?</label><input id=aboard placeholder="comma separated, e.g. Jimi, Alex, kids">
+<div class=two><div><label>Start date</label><input id=ds type=date></div>
+<div><label>End date</label><input id=de type=date></div></div>
+<button id=go type=submit>Save &amp; start trip</button>
+<button id=end type=button class=alt>End current trip</button>
+</form><div id=out></div></main><script>
+var out=document.getElementById('out'),go=document.getElementById('go');
+function show(ok,msg){out.style.display='block';out.className=ok?'ok':'err';out.textContent=msg;}
+function refresh(){fetch('/api/trip').then(r=>r.json()).then(d=>{
+ var c=document.getElementById('cur');
+ if(d.activeTripId&&d.trips&&d.trips[d.activeTripId]){var t=d.trips[d.activeTripId];
+  c.textContent='Active trip: '+t.title+(t.destName?(' → '+t.destName):'')+(t.dest?'  📍':'  (no map pin yet)');}
+ else{c.textContent='No active trip.';}}).catch(()=>{});}
+refresh();
+document.getElementById('f').onsubmit=function(e){e.preventDefault();
+ var title=document.getElementById('title').value.trim();
+ if(!title){show(false,'Give the trip a name.');return;}
+ var fd=new FormData();fd.append('title',title);
+ fd.append('destName',document.getElementById('dest').value.trim());
+ fd.append('aboard',document.getElementById('aboard').value);
+ fd.append('dateStart',document.getElementById('ds').value);
+ fd.append('dateEnd',document.getElementById('de').value);
+ function send(){go.disabled=true;fetch('/api/trip',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+  go.disabled=false;
+  if(d.ok)show(true,'Trip saved'+(d.dest?(' with map pin.'):' (no map pin — '+(d.destReason||'add a destination')+').'));
+  else show(false,'Could not save: '+(d.error||'try again'));refresh();})
+  .catch(()=>{go.disabled=false;show(false,'Network error — are you on SallyNet Wi-Fi?');});}
+ if(document.getElementById('pin').checked&&navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(function(p){fd.append('pin','1');
+   fd.append('lat',p.coords.latitude);fd.append('lon',p.coords.longitude);send();},
+   function(){fd.append('pin','1');send();},{timeout:8000});
+ }else send();};
+document.getElementById('end').onclick=function(){
+ var fd=new FormData();fd.append('end','1');
+ fetch('/api/trip',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+  show(true,'Trip ended.');refresh();}).catch(()=>show(false,'Network error.'));};
+</script></body></html>"""
+
+
+# Driver fuel/mileage logger (C3). Plain numeric entry — the phone's native number pad
+# (inputmode=decimal) keeps it one-handed at the pump; the same fields map onto the
+# eventual ESP32 keypad. datetime + GPS are stamped server-side.
+_FUEL_HTML = """<!doctype html><html lang=en><head>
+<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Sally — Fuel log</title><style>
+:root{--g:#d4a017;--r:#c0392b;--o:#e67e22;--ink:#2b2b2b}
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#faf7f0;color:var(--ink)}
+header{background:var(--g);padding:18px 16px;border-bottom:4px solid var(--r)}
+h1{margin:0;font-size:1.25rem}main{padding:16px;max-width:560px;margin:0 auto}
+label{display:block;margin:14px 0 4px;font-weight:600}
+input,button{width:100%;padding:14px;font-size:1.15rem;border:1px solid #ccc;border-radius:8px}
+button{background:var(--r);color:#fff;border:0;font-weight:700;margin-top:18px}button:disabled{opacity:.5}
+.hint{color:#777;font-size:.85rem;margin-top:4px}
+#last{background:#eef;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.9rem}
+#out{margin-top:16px;padding:12px;border-radius:8px;display:none}.ok{background:#e8f5e9}.err{background:#fdecea}
+</style></head><body>
+<header><h1>⛽ Sally fuel log</h1></header><main>
+<div id=last></div>
+<form id=f>
+<label>Odometer (km)</label>
+<input id=odo type=text inputmode=decimal placeholder="e.g. 142357">
+<label>Litres filled</label>
+<input id=litres type=text inputmode=decimal placeholder="e.g. 87.4">
+<label>Price per litre ($)</label>
+<input id=price type=text inputmode=decimal placeholder="e.g. 1.62">
+<button id=go type=submit>Save fill-up</button>
+<div class=hint>Date, time &amp; location are added automatically.</div>
+</form><div id=out></div></main><script>
+var out=document.getElementById('out'),go=document.getElementById('go');
+function show(ok,msg){out.style.display='block';out.className=ok?'ok':'err';out.textContent=msg;}
+function refresh(){fetch('/api/state').then(r=>r.json()).then(s=>{
+ var l=document.getElementById('last');
+ if(s.fuel&&s.fuel.last){var f=s.fuel.last;var t='Last fill: '+f.litres+' L';
+  if(f.l_100km)t+=' · '+f.l_100km+' L/100km';
+  if(s.fuel.avg_l_100km)t+=' · avg '+s.fuel.avg_l_100km;l.textContent=t;}
+ else l.textContent='No fill-ups logged yet.';}).catch(()=>{});}
+refresh();
+document.getElementById('f').onsubmit=function(e){e.preventDefault();
+ var fd=new FormData();
+ fd.append('odo',document.getElementById('odo').value);
+ fd.append('litres',document.getElementById('litres').value);
+ fd.append('price',document.getElementById('price').value);
+ go.disabled=true;fetch('/api/fuel-log',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+  go.disabled=false;
+  if(d.ok){var m='Logged '+d.entry.litres+' L for $'+d.entry.total_cost;
+   if(d.entry.l_100km)m+=' — '+d.entry.l_100km+' L/100km this tank.';
+   show(true,m);document.getElementById('f').reset();refresh();}
+  else show(false,'Could not save: '+(d.error||'check the numbers'));})
+  .catch(()=>{go.disabled=false;show(false,'Network error — are you on SallyNet Wi-Fi?');});};
+</script></body></html>"""
+
+
+# Cached readers for the trip store + OSRM route cache (mtime-checked per request).
+_trips = store.CachedJson(cfg.TRIPS_JSON, {"activeTripId": None, "trips": {}})
+_route = store.CachedJson(cfg.ROUTE_JSON, {})
+_fuel = store.CachedJson(cfg.FUEL_LOG_JSON, {"entries": []})
+
+
+def _active_trip():
+    """Return the active trip dict (with dest/aboard/etc.) or None."""
+    data = _trips.get()
+    tid = data.get("activeTripId")
+    if not tid:
+        return None
+    return (data.get("trips") or {}).get(tid)
+
+
+def _geocode(name):
+    """Best-effort OSM Nominatim geocode -> (lat, lon) or None (offline/unmatched)."""
+    if not name:
+        return None
+    try:
+        url = cfg.NOMINATIM_URL + "?" + urllib.parse.urlencode(
+            {"q": name, "format": "json", "limit": 1})
+        req = urllib.request.Request(url, headers={"User-Agent": cfg.GEO_USER_AGENT})
+        with urllib.request.urlopen(req, timeout=8) as r:
+            hits = json.loads(r.read().decode())
+        if hits:
+            return float(hits[0]["lat"]), float(hits[0]["lon"])
+    except Exception:
+        return None
+    return None
+
 
 def _haversine_km(lat1, lon1, lat2, lon2):
     r = 6371.0088
@@ -116,14 +269,64 @@ def _prune(obj):
     return obj
 
 
-def _derive_mode(gps, km_from_home):
+def _derive_mode(gps, km_from_home, km_to_dest):
+    """Instantaneous mode hint (the Roku applies hysteresis). `camping` requires an
+    active trip with a destination pin we're stopped within — it can't be inferred
+    from GPS alone, which is why a generic stop is `parked`, not `camping`."""
     if not gps["fix"]:
         return "unknown"
     if (gps["speed_kmh"] or 0) >= cfg.DRIVING_KMH:
         return "driving"
     if km_from_home is not None and km_from_home * 1000.0 <= cfg.HOME_RADIUS_M:
         return "at_home"
+    if km_to_dest is not None and km_to_dest * 1000.0 <= cfg.DEST_RADIUS_M:
+        return "camping"
     return "parked"
+
+
+def _trip_state(active, km_to_dest):
+    """Project the active trip into the /api/state `trip` section. ETA comes from the
+    OSRM route cache (scripts/trip-eta-refresh.py) when fresh; km_to_dest (haversine)
+    is always present so something shows offline."""
+    section = {
+        "id": active.get("id"),
+        "title": active.get("title"),
+        "destName": active.get("destName"),
+        "dest": active.get("dest"),
+        "aboard": active.get("aboard"),
+        "dateStart": active.get("dateStart"),
+        "dateEnd": active.get("dateEnd"),
+        "km_to_dest": km_to_dest,
+    }
+    route = _route.get()
+    if route and route.get("tripId") == active.get("id") and route.get("eta_epoch"):
+        section["eta"] = int(route["eta_epoch"])           # arrival, unix seconds UTC
+        section["roadKm"] = route.get("road_km")
+        section["etaSource"] = "osrm"
+        section["etaStaleSec"] = max(0, int(time.time()) - int(route.get("computed_at", 0)))
+    return section
+
+
+def _fuel_state():
+    """Project the fuel log into the /api/state `fuel` section: last fill + the
+    running average economy. None when nothing's been logged."""
+    entries = (_fuel.get() or {}).get("entries") or []
+    if not entries:
+        return None
+    last = entries[-1]
+    econ = [e["l_100km"] for e in entries if e.get("l_100km")]
+    avg = round(sum(econ) / len(econ), 1) if econ else None
+    return {
+        "last": {
+            "date": last.get("datetime"),
+            "odo_km": last.get("odo_km"),
+            "litres": last.get("litres"),
+            "total": last.get("total_cost"),
+            "l_100km": last.get("l_100km"),
+        },
+        "avg_l_100km": avg,
+        "fills": len(entries),
+    }
 
 
 # =============================================================================
@@ -150,12 +353,33 @@ def _load_catalog():
     return _catalog["data"]
 
 
+def _trip_stub(t):
+    """A zero-item browse collection for a trip that's been planned but has no media yet
+    (catalog.json only lists collections that have items). Lets a freshly-created trip
+    appear in the upload form's picker immediately, before any reindex."""
+    return _prune({
+        "id": t["id"], "kind": "trip", "title": t.get("title") or t["id"],
+        "itemCount": 0, "videoCount": 0, "photoCount": 0,
+        "dateStart": t.get("dateStart"), "dateEnd": t.get("dateEnd"),
+        "place": t.get("place") or t.get("destName"),
+        "detailUrl": "/api/collections/" + t["id"],
+    })
+
+
 @app.route("/api/media")
 def api_media():
     """type=trips -> home collections. movies|tv|kids (studio library) not in this build."""
     t = request.args.get("type", "trips")
+    if t != "trips":
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "type": t, "collections": []})
     cat = _load_catalog()
-    cols = cat.get("collections", []) if t == "trips" else []
+    cols = list(cat.get("collections", []))
+    have = {c.get("id") for c in cols}
+    # Surface planned-but-empty trips from the store (not yet in the reindexed catalog).
+    for cid, trip in (_trips.get().get("trips") or {}).items():
+        if cid not in have and trip.get("id"):
+            cols.append(_trip_stub(trip))
+    cols.sort(key=lambda c: c.get("dateStart") or "", reverse=True)
     return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "type": t, "collections": cols})
 
 
@@ -164,6 +388,15 @@ def api_collection(cid):
     cat = _load_catalog()
     items = cat.get("items", {}).get(cid)
     if items is None:
+        # A planned-but-empty trip drills into an empty (not missing) collection.
+        trip = (_trips.get().get("trips") or {}).get(cid)
+        if trip:
+            return jsonify(_prune({
+                "schemaVersion": cfg.SCHEMA_VERSION, "id": cid, "kind": "trip",
+                "title": trip.get("title"), "dateStart": trip.get("dateStart"),
+                "dateEnd": trip.get("dateEnd"),
+                "place": trip.get("place") or trip.get("destName"), "items": [],
+            }))
         abort(404)
     meta = next((c for c in cat.get("collections", []) if c.get("id") == cid), {})
     return jsonify(_prune({
@@ -374,6 +607,191 @@ def upload_page():
     return Response(_UPLOAD_HTML, mimetype="text/html")
 
 
+@app.route("/trip")
+def trip_page():
+    """Driver/navigator trip-entry form."""
+    return Response(_TRIP_HTML, mimetype="text/html")
+
+
+@app.route("/api/trip")
+def api_trip_get():
+    """Current trip store — the form shows the active trip + offers to end it."""
+    data = _trips.get()
+    return jsonify({"schemaVersion": cfg.SCHEMA_VERSION,
+                    "activeTripId": data.get("activeTripId"),
+                    "trips": data.get("trips") or {}})
+
+
+def _write_hdd_trip_json(rec):
+    """Best-effort mirror to the legacy HDD trips/<cid>/trip.json so the media pipeline
+    keeps its hand-editable per-collection file. The SD trips.json is canonical; a dead
+    HDD just means this no-ops."""
+    try:
+        d = os.path.join(cfg.MEDIA_ROOT, "trips", rec["id"])
+        os.makedirs(d, exist_ok=True)
+        tmp = os.path.join(d, "trip.json.tmp")
+        with open(tmp, "w") as f:
+            json.dump(_prune({k: rec.get(k) for k in
+                              ("id", "kind", "title", "place", "dateStart", "dateEnd")}), f)
+        os.replace(tmp, os.path.join(d, "trip.json"))
+    except OSError:
+        pass
+
+
+@app.route("/api/trip", methods=["POST"])
+def api_trip_post():
+    """Create/replace the active trip (or end it). Geocodes the destination over LTE,
+    or pins the current GPS as a fallback, so the camping geofence has coordinates."""
+    data = _trips.get()
+    store_obj = {"activeTripId": data.get("activeTripId"),
+                 "trips": dict(data.get("trips") or {})}
+
+    if request.form.get("end"):
+        store_obj["activeTripId"] = None
+        store.atomic_write_json(cfg.TRIPS_JSON, store_obj)
+        _trips.invalidate()
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True, "activeTripId": None})
+
+    title = request.form.get("title", "").strip()
+    if not title:
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": False,
+                        "error": "title required"}), 400
+    cid = store.slug(title)
+    if not cid:
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": False,
+                        "error": "title has no usable characters"}), 400
+
+    dest_name = request.form.get("destName", "").strip() or None
+    aboard = [n.strip() for n in request.form.get("aboard", "").split(",") if n.strip()]
+
+    # Destination coords: pin current GPS if asked (offline escape hatch), else geocode.
+    dest = None
+    dest_reason = None
+    if request.form.get("pin"):
+        lat, lon = request.form.get("lat"), request.form.get("lon")
+        if lat and lon:
+            try:
+                dest = {"lat": float(lat), "lon": float(lon)}
+            except ValueError:
+                dest = None
+        if dest is None:
+            gps = read_fix(cfg.GPSD_HOST, cfg.GPSD_PORT)
+            if gps["fix"] and gps["lat"] is not None:
+                dest = {"lat": gps["lat"], "lon": gps["lon"]}
+        if dest is None:
+            dest_reason = "no GPS fix to pin"
+    elif dest_name:
+        geo = _geocode(dest_name)
+        if geo:
+            dest = {"lat": geo[0], "lon": geo[1]}
+        else:
+            dest_reason = "destination not found / offline"
+
+    # Keep an existing dest if re-saving the same trip without resolving a new one.
+    prior = store_obj["trips"].get(cid, {})
+    if dest is None and prior.get("dest"):
+        dest = prior["dest"]
+
+    rec = {
+        "id": cid,
+        "kind": "trip",
+        "title": title,
+        "place": dest_name or prior.get("place"),
+        "destName": dest_name or prior.get("destName"),
+        "dest": dest,
+        "aboard": aboard,
+        "dateStart": request.form.get("dateStart", "").strip() or prior.get("dateStart") or None,
+        "dateEnd": request.form.get("dateEnd", "").strip() or prior.get("dateEnd") or None,
+        "createdTs": prior.get("createdTs") or int(time.time()),
+        "updatedTs": int(time.time()),
+    }
+    store_obj["trips"][cid] = _prune(rec)
+    store_obj["activeTripId"] = cid
+    store.atomic_write_json(cfg.TRIPS_JSON, store_obj)
+    _trips.invalidate()
+    _write_hdd_trip_json(rec)
+
+    return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True, "id": cid,
+                    "dest": dest, "destReason": dest_reason})
+
+
+@app.route("/fuel")
+def fuel_page():
+    """Driver fuel/mileage entry form."""
+    return Response(_FUEL_HTML, mimetype="text/html")
+
+
+def _num(v):
+    try:
+        return float(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _append_fuel_md(entry):
+    """Mirror each fill-up into a human-readable Markdown table (best-effort)."""
+    try:
+        path = cfg.FUEL_LOG_MD
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        new = not os.path.exists(path)
+        with open(path, "a") as f:
+            if new:
+                f.write("# Sally fuel log\n\n")
+                f.write("| Date | Odometer (km) | Litres | $/L | Total | L/100km |\n")
+                f.write("|---|---|---|---|---|---|\n")
+            f.write("| %s | %s | %s | %s | %s | %s |\n" % (
+                entry.get("datetime", ""), entry.get("odo_km", ""),
+                entry.get("litres", ""), entry.get("price_per_l", ""),
+                entry.get("total_cost", ""),
+                entry.get("l_100km", "") if entry.get("l_100km") is not None else ""))
+    except OSError:
+        pass
+
+
+@app.route("/api/fuel-log", methods=["POST"])
+def api_fuel_log():
+    """Log a fill-up. Computes L/100km + mpg from the odometer delta to the previous
+    fill, stamps GPS time + location, appends to fuel-log.json (SD) + docs/fuel-log.md."""
+    odo = _num(request.form.get("odo"))
+    litres = _num(request.form.get("litres"))
+    price = _num(request.form.get("price"))
+    if litres is None or litres <= 0:
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": False,
+                        "error": "litres required"}), 400
+
+    gps = read_fix(cfg.GPSD_HOST, cfg.GPSD_PORT)
+    # Prefer GPS UTC time (the Pi has no RTC and may be offline); fall back to server clock.
+    when = gps.get("time") or datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    data = _fuel.get()
+    entries = list(data.get("entries") or [])
+
+    entry = {
+        "ts": int(time.time()),
+        "datetime": when,
+        "odo_km": odo,
+        "litres": round(litres, 2),
+        "price_per_l": price,
+        "total_cost": round(litres * price, 2) if price is not None else None,
+    }
+    if gps["fix"] and gps["lat"] is not None:
+        entry["lat"], entry["lon"] = gps["lat"], gps["lon"]
+
+    # Economy for THIS tank = litres just added / distance since the previous fill.
+    prev_odo = next((e["odo_km"] for e in reversed(entries) if e.get("odo_km") is not None), None)
+    if odo is not None and prev_odo is not None and odo > prev_odo:
+        dist = odo - prev_odo
+        entry["l_100km"] = round(litres / dist * 100.0, 1)
+        entry["mpg_imp"] = round(282.481 / entry["l_100km"], 1)  # imperial gallon
+
+    entries.append(_prune(entry))
+    store.atomic_write_json(cfg.FUEL_LOG_JSON, {"schemaVersion": cfg.SCHEMA_VERSION,
+                                                "entries": entries})
+    _fuel.invalidate()
+    _append_fuel_md(entry)
+    return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True, "entry": _prune(entry)})
+
+
 @app.route("/api/state")
 def api_state():
     gps = read_fix(cfg.GPSD_HOST, cfg.GPSD_PORT)
@@ -382,11 +800,26 @@ def api_state():
         km_from_home = round(
             _haversine_km(gps["lat"], gps["lon"], cfg.HOME_LAT, cfg.HOME_LON), 1
         )
+
+    # Active trip drives the camping geofence + the Drive-screen destination/ETA.
+    active = _active_trip()
+    km_to_dest = None
+    trip_section = None
+    if active is not None:
+        dest = active.get("dest") or {}
+        if gps["fix"] and gps["lat"] is not None and dest.get("lat") is not None:
+            km_to_dest = round(
+                _haversine_km(gps["lat"], gps["lon"], dest["lat"], dest["lon"]), 1
+            )
+        trip_section = _trip_state(active, km_to_dest)
+
     payload = {
         "schemaVersion": cfg.SCHEMA_VERSION,
         "ts": int(time.time()),
-        "mode": _derive_mode(gps, km_from_home),
+        "mode": _derive_mode(gps, km_from_home, km_to_dest),
         "gps": gps,
+        "trip": trip_section,   # omitted (pruned) when no active trip
+        "fuel": _fuel_state(),  # omitted (pruned) when no fill-ups logged
         "drive": {
             "odo_km": None,
             "trip_km": None,
@@ -430,6 +863,7 @@ def index():
             "/api/state", "/api/discovery", "/api/health",
             "/api/media?type=trips", "/api/collections/<id>", "/api/photos",
             "/media/<path>", "/api/qr.png", "/api/upload", "/upload",
+            "/trip", "/api/trip", "/fuel", "/api/fuel-log",
         ],
     })
 

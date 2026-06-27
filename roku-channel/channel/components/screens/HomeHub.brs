@@ -7,7 +7,7 @@ sub init()
         { label: "Drive",   route: "drive",   enabled: true },
         { label: "Media",   route: "media",   enabled: true },
         { label: "Photos",  route: "photos",  enabled: true },
-        { label: "Camp",    route: "camp",    enabled: false },
+        { label: "Camp",    route: "camp",    enabled: true },
         { label: "Cameras", route: "cameras", enabled: false },
         { label: "Systems", route: "systems", enabled: false }
     ]

@@ -21,6 +21,7 @@ sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/media-ingest.sh" "$REPO/scripts/media-encode-video.sh" \
   "$REPO/scripts/media-encode-photo.sh" "$REPO/scripts/media-extract-meta.py" \
   "$REPO/scripts/media-track-logger.py" "$REPO/scripts/media-reindex.py" \
+  "$REPO/scripts/trip-eta-refresh.py" \
   "$PI_USER@$PI_HOST:/opt/sally/media/"
 sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/lib/" "$PI_USER@$PI_HOST:/opt/sally/media/lib/"
@@ -37,11 +38,17 @@ for u in media-track-logger.service media-encode.service media-encode.timer; do
   sshpass -e scp "${SSH_OPTS[@]}" "$REPO/configs/media/$u" "$PI_USER@$PI_HOST:/tmp/$u"
   sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" "sudo mv /tmp/$u /etc/systemd/system/$u"
 done
+# trip ETA refresher (telemetry unit dir) — 60s timer, no-ops without an active trip.
+for u in trip-eta.service trip-eta.timer; do
+  sshpass -e scp "${SSH_OPTS[@]}" "$REPO/configs/telemetry/$u" "$PI_USER@$PI_HOST:/tmp/$u"
+  sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" "sudo mv /tmp/$u /etc/systemd/system/$u"
+done
 sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
   "sudo systemctl daemon-reload \
    && sudo systemctl enable --now media-track-logger.service \
    && sudo systemctl enable --now media-encode.timer \
-   && sleep 1 && systemctl is-active media-track-logger.service && systemctl list-timers media-encode.timer --no-pager | head -3"
+   && sudo systemctl enable --now trip-eta.timer \
+   && sleep 1 && systemctl is-active media-track-logger.service && systemctl list-timers media-encode.timer trip-eta.timer --no-pager | head -4"
 
 header "ensuring HDD tree exists"
 sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \

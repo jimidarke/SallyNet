@@ -31,6 +31,9 @@ import time
 SIDECAR_DIR = os.environ.get("SIDECAR_DIR", "/mnt/usb/home/catalog/items")
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT", "/mnt/usb/home/library")
 CATALOG_JSON = os.environ.get("CATALOG_JSON", "/var/lib/sally/catalog.json")
+# Canonical trip store (SD card) written by sally-api's trip-entry form. Source of
+# truth for trip metadata; wins over the legacy per-collection HDD trip.json files.
+TRIPS_JSON = os.environ.get("TRIPS_JSON", "/var/lib/sally/trips.json")
 
 
 def media_url(relpath):
@@ -49,7 +52,14 @@ def load_sidecars():
 
 
 def load_trip_meta():
-    """collectionId -> trip.json dict (title, place, cover, dates)."""
+    """collectionId -> trip metadata (title, place, cover, dates).
+
+    Reconciles two sources: the legacy per-collection HDD trip.json files (kept for
+    backward-compat / hand edits) and the canonical SD trips.json the dashboard's
+    trip-entry form writes. The SD store WINS per collection — it removes a read
+    dependency on the failing HDD and lets trip entry create a collection's metadata
+    before any photo lands there.
+    """
     meta = {}
     for p in glob.glob(os.path.join(MEDIA_ROOT, "trips", "*", "trip.json")):
         try:
@@ -59,6 +69,14 @@ def load_trip_meta():
                 meta[t["id"]] = t
         except (ValueError, OSError):
             continue
+    try:
+        with open(TRIPS_JSON) as f:
+            store = json.load(f)
+        for cid, t in (store.get("trips") or {}).items():
+            if t.get("id"):
+                meta[cid] = {**meta.get(cid, {}), **t}  # SD store overrides HDD
+    except (ValueError, OSError):
+        pass
     return meta
 
 

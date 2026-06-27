@@ -1,0 +1,17 @@
+[Unit]
+Description=SallyNet LTE modem monitor (QX210 wwan0 bandwidth + signal -> MQTT)
+After=network-online.target mosquitto.service
+Wants=network-online.target
+# Keep restarting forever even after repeated early failures (router/broker may
+# be down for a while); the script also tolerates blips internally.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/sally/lte-monitor.env
+ExecStart=/usr/bin/python3 /opt/sally/net/lte-monitor.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

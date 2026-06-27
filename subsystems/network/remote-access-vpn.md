@@ -38,6 +38,22 @@ Once live, from a machine on the home WG:
 - **Permitted clients:** `jimi` (`10.10.10.2`) and `wsl-JimiDell` (`10.10.10.5`) — per-client `forward` rules on the hub (see `add-wg-site-peer-sally.rsc`). To add another client, mirror the rule for its overlay IP.
 - **From this WSL dev box** (the `.5` client): `sudo wg-quick up ~/code/homeController/secrets/wg-clients/sally.conf` (split tunnel — overlay + Sally only, no home-LAN hairpin; passwordless via a `wg-quick` sudoers drop-in), then `ssh -i ~/.ssh/sally_campingpi pi@10.66.12.216`. `sudo wg-quick down …/sally.conf` when done. Note the conf must be short-named (interface name ≤15 chars).
 
+## Self-healing watchdog (2026-06-26)
+
+The stock `wg-quick@wg-home` unit can die and **stay dead** two ways the keepalive can't fix:
+
+1. **Boot race** — `campingpi` boots faster than the QX210 acquires LTE. `wg-quick` is `Type=oneshot`; if the hub DDNS can't resolve at boot it **fails and never retries** (and oneshot units *reject* `Restart=`, so a drop-in is not an option).
+2. **DNS staleness** — `wg-quick` resolves the `Endpoint` hostname **only once**, at setconf time. The hub sits behind `hub.example.net` *dynamic* DNS, so a hub WAN-IP change leaves the Pi firing keepalives at a dead address forever. (This is what caused the observed **11-minute-stale** handshake while Sally's LAN was otherwise healthy.)
+
+Fix: a watchdog timer on the Pi — **`scripts/wg-watchdog.sh`** + **`configs/network/sally-wg-watchdog.{service,timer}`**, deployed to `/opt/sally/net/wg-watchdog.sh`, fired every 60s by `sally-wg-watchdog.timer` (`OnBootSec=60`, `OnUnitActiveSec=60`). Each tick:
+- (re)starts `wg-quick@wg-home` if the unit isn't active → **the watchdog *is* the boot-race retry** (covers #1);
+- re-resolves `hub.example.net` and updates the peer endpoint in place if the hub IP moved (covers #2);
+- restarts the tunnel if no handshake within `STALE_AFTER` (150s) — catches any remaining wedge.
+
+Deploy with **`scripts/deploy-wg-watchdog.sh`** (key-based over the tunnel; `PI_HOST` defaults to `10.66.12.216`). Verified 2026-06-26: timer enabled + active, manual run logged `ok (handshake 70s ago, hub 203.0.113.10)`. Tune thresholds via env (`STALE_AFTER`, `HUB_HOST`, `HUB_PUBKEY`). Note this only papers over brownout-induced drops — fix the Pi's 5V feed too (see [`../power/`](../power/README.md)).
+
+> Ops gotcha: deploying over cellular while Sally is streaming (movie/tablet) → **bufferbloat ~3–4 s RTT**; multi-round-trip `scp` stalls. Use the single-connection base64 path (one SSH, files inlined) instead — `deploy-wg-watchdog.sh` is multi-hop and may time out under load.
+
 ## Implementation notes
 
 - **No `iptables-persistent`.** Raspbian Buster is EOL — its main repo is dead (`netfilter-persistent`/`iptables-persistent` 404). So the NETMAP/MASQUERADE/FORWARD rules live as **`PostUp`/`PostDown`** in `wg-home.conf` instead; they re-apply on every `wg-quick up`, i.e. every boot via the enabled unit. (`wireguard-tools` itself installed fine from the still-live `archive.raspberrypi.org` repo.)
@@ -48,4 +64,4 @@ Cross-refs: [`../media/retropie-notes.md`](../media/retropie-notes.md) (the host
 
 ## Next action
 
-Operational. Two housekeeping follow-ups: (1) pull a fresh DarkeRouter `/export` into the `homeController` repo to capture the change; (2) once the Pi's power feed is fixed (`../power/`), confirm the tunnel stays up reliably across Sally power-cycles.
+Operational + self-healing (watchdog deployed 2026-06-26). Follow-ups: (1) pull a fresh DarkeRouter `/export` into the `homeController` repo to capture the peer change; (2) once the Pi's power feed is fixed (`../power/`), confirm the tunnel survives Sally power-cycles unattended — watch `journalctl -u sally-wg-watchdog.service` across a cold boot to verify it recovers the boot race in the wild (not just the same-Pi-only reboot tested so far).
