@@ -40,6 +40,10 @@ Minimal intrusion, keeps the OEM dash panel. **Fallback — Garnet SeeLevel II**
 under-floor tank-material photo rules out probe reuse. The ladder above lists the other options
 considered (not chosen). Propane stays non-invasive (Mopeka clip-on + 12V leak detector).
 
+> The tank node's firmware / MQTT / power / secrets conventions follow the fleet contract in
+> [`../telemetry/esp-fleet.md`](../telemetry/esp-fleet.md) (node #3). **Fresh-fill status falls out
+> of the fresh-tank level trend** — no extra sensor needed.
+
 _Earlier write-up (kept for reference):_
 
 If tanks are plastic/poly → **SeeLevel II**, full retrofit, retire the OEM panel.

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  MapScreen — the ambient "where are we" map. Shows the server-composited /api/map.png as a
+  fullscreen Poster, re-fetched on each /api/state poll (cache-busted by state.ts so the
+  changing image actually reloads). Two posters ping-pong so a slow/failed fetch never blanks
+  the screen. Purely passive: no on-TV interaction, Back returns Home (handled by MainScene).
+  The server owns centre + speed-based zoom, so the Roku stays dumb.
+  See ../../../subsystems/gps/map-navigation-brainstorm.md.
+-->
+<component name="MapScreen" extends="Group" initialFocus="sink">
+    <interface>
+        <field id="state" type="assocarray" onChange="onState" />
+    </interface>
+    <script type="text/brightscript" uri="MapScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8DCC8FF" />
+        <Poster id="posterA" width="1920" height="1080" loadDisplayMode="scaleToFill"
+                opacity="1.0" uri="pkg:/images/transparent.png" />
+        <Poster id="posterB" width="1920" height="1080" loadDisplayMode="scaleToFill"
+                opacity="0.0" uri="pkg:/images/transparent.png" />
+        <Label id="statusMsg" translation="[60, 500]" width="1800" horizAlign="center"
+               color="0x2B2A26AA" font="font:MediumBoldSystemFont" text="Loading map…" />
+        <Rectangle id="sink" width="1" height="1" color="0x00000000" />
+    </children>
+</component>

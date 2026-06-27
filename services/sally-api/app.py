@@ -13,6 +13,7 @@ import mimetypes
 import os
 import re
 import subprocess
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -23,7 +24,18 @@ from werkzeug.utils import secure_filename
 
 import sallyconf as cfg
 import store
+import trail
+import waypoints as waypoints_mod
 from gpsd_client import read_fix
+
+# Map compositor (needs Pillow). Imported optionally so a host without Pillow still boots the
+# rest of the API — /api/map.png just 501s. Pillow is in requirements.txt and present on the Pi.
+try:
+    import tiles
+    import mapgen
+    _MAP_OK = True
+except ImportError:
+    _MAP_OK = False
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = cfg.UPLOAD_MAX_BYTES
@@ -212,6 +224,84 @@ document.getElementById('f').onsubmit=function(e){e.preventDefault();
 _trips = store.CachedJson(cfg.TRIPS_JSON, {"activeTripId": None, "trips": {}})
 _route = store.CachedJson(cfg.ROUTE_JSON, {})
 _fuel = store.CachedJson(cfg.FUEL_LOG_JSON, {"entries": []})
+_waypoints = store.CachedJson(cfg.WAYPOINTS_JSON, {"waypoints": []})
+_wproute = store.CachedJson(cfg.WAYPOINT_ROUTE_JSON, {})
+_poi = store.CachedJson(cfg.POI_CACHE_JSON, {"regions": []})
+_photo_poi = store.CachedJson(cfg.PHOTO_POI_JSON, {"photos": []})
+_trail = trail.TrailCache(cfg.TRACKS_DIR)
+
+# Shared, persisted map view-state: the layer set every viewer + the Roku glass renders. The
+# default carries no `layers` so a fresh install falls back to "all layers"; _DEFAULT_LAYERS is
+# only the no-Pillow fallback layer set (mapgen is the live SSOT when it imported).
+_DEFAULT_LAYERS = ("base", "trail", "poi", "photos", "waypoints", "labels", "status")
+_view = store.CachedJson(cfg.VIEW_STATE_JSON, {"schemaVersion": cfg.SCHEMA_VERSION})
+
+# GPS-loss tracking: the nav-tick read-model (nav-state.json) is primary — fresh even when nobody
+# polls; the in-process _last_good tracker is the fallback when nav-tick is off but someone polls.
+_nav = store.CachedJson(cfg.NAV_STATE_JSON, {})
+_last_good = {"ts": 0.0, "lat": None, "lon": None, "speed_kmh": None}
+
+
+def _all_layers():
+    """The valid layer names — the live mapgen set, or the literal fallback without Pillow."""
+    return set(mapgen.ALL_LAYERS) if _MAP_OK else set(_DEFAULT_LAYERS)
+
+
+def _view_state():
+    """Shared view state with defaults filled + layers validated against the live layer set.
+    Empty/missing layers fall back to ALL layers (a fresh install shows everything)."""
+    vs = _view.get() or {}
+    allset = _all_layers()
+    layers = [l for l in (vs.get("layers") or []) if l in allset]
+    if not layers:
+        layers = sorted(allset)
+    return {"layers": layers, "baseSource": vs.get("baseSource") or "street",
+            "updatedTs": vs.get("updatedTs")}
+
+# Shared short-TTL GPS fix. /api/state and /api/map.png both poll on the Roku's cadence;
+# without this each does its own ~2.5 s gpsd read and doubles the load. The lock makes a
+# cold-cache refresh single-flight so concurrent requests coalesce onto one read.
+_fix_lock = threading.Lock()
+_fix_cache = {"fix": None, "at": 0.0}
+_FIX_TTL_S = 2.0
+
+
+def _cached_fix():
+    """The most recent gpsd fix, re-read at most every _FIX_TTL_S seconds."""
+    now = time.time()
+    if _fix_cache["fix"] is not None and (now - _fix_cache["at"]) < _FIX_TTL_S:
+        return _fix_cache["fix"]
+    with _fix_lock:
+        now = time.time()
+        if _fix_cache["fix"] is not None and (now - _fix_cache["at"]) < _FIX_TTL_S:
+            return _fix_cache["fix"]
+        fix = read_fix(cfg.GPSD_HOST, cfg.GPSD_PORT)
+        _track_fix(fix)
+        _fix_cache["fix"] = fix
+        _fix_cache["at"] = time.time()
+        return fix
+
+
+def _track_fix(fix):
+    """Remember the last good fix in-process so /api/map.png can report a fix-age even when the
+    nav-tick daemon isn't running (it just needs someone to be polling gpsd via _cached_fix)."""
+    if fix.get("fix") and fix.get("lat") is not None:
+        _last_good.update(ts=time.time(), lat=fix["lat"], lon=fix["lon"],
+                          speed_kmh=fix.get("speed_kmh"))
+
+
+def _fix_age_and_last(gps):
+    """(secondsSinceFix, last_known, had_fix). Prefer the nav-tick read-model (fresh even with no
+    polling); fall back to the in-process tracker; finally 'never had a fix this session'."""
+    now = time.time()
+    if gps.get("fix") and gps.get("lat") is not None:
+        return 0, {"lat": gps["lat"], "lon": gps["lon"], "speed_kmh": gps.get("speed_kmh")}, True
+    nav = _nav.get() or {}
+    if nav.get("ts") and (now - nav["ts"]) < cfg.NAV_STATE_STALE_S:
+        return nav.get("secondsSinceFix"), nav.get("lastKnown") or {}, bool(nav.get("hadFix"))
+    if _last_good["lat"] is not None:
+        return int(now - _last_good["ts"]), dict(_last_good), True
+    return int(now - _BOOT), {}, False
 
 
 def _active_trip():
@@ -501,6 +591,406 @@ def api_qr():
         img.save(buf, format="PNG")
         _qr_cache[url] = buf.getvalue()
     return Response(_qr_cache[url], mimetype="image/png")
+
+
+# =============================================================================
+# Ambient map (P2) — /api/map.png. mapgen.py bakes one PNG from live GPS + cached tiles +
+# the breadcrumb/waypoint/POI layers; the Roku just displays it. The server owns the centre
+# (live GPS) and the speed-based zoom, so the Roku can fetch with no params at all.
+# See subsystems/gps/map-navigation-brainstorm.md.
+# =============================================================================
+
+def _map_center_zoom(gps, last_known, args):
+    """Centre = live GPS; on no-fix FREEZE at the last-known position (teleporting to the home
+    anchor mid-trip is confusing) and freeze the last zoom band; the home anchor is used only when
+    we never had a fix. An undocumented ?center=lat,lon override exists for offline/demo rendering."""
+    center = (cfg.HOME_LAT, cfg.HOME_LON)
+    if gps.get("fix") and gps.get("lat") is not None:
+        center = (gps["lat"], gps["lon"])
+    elif last_known.get("lat") is not None:
+        center = (last_known["lat"], last_known["lon"])
+    c = args.get("center")
+    if c:
+        try:
+            lat, lon = c.split(",")
+            center = (float(lat), float(lon))
+        except (ValueError, TypeError):
+            pass
+    z = args.get("z", "auto")
+    if z in ("auto", "", None):
+        spd, has_fix = gps.get("speed_kmh"), bool(gps.get("fix"))
+        if not has_fix and last_known.get("speed_kmh") is not None:
+            spd, has_fix = last_known["speed_kmh"], True  # freeze the last band, don't snap tight
+        zoom = tiles.speed_to_zoom(spd, has_fix=has_fix)
+    else:
+        try:
+            zoom = max(tiles.ZOOM_MIN, min(tiles.ZOOM_MAX, int(z)))
+        except (ValueError, TypeError):
+            zoom = tiles.speed_to_zoom(gps.get("speed_kmh"), has_fix=bool(gps.get("fix")))
+    return center, zoom
+
+
+def _parse_layers(arg, default_layers):
+    """Explicit ?layers= CSV is a one-off override (debugging); with no param the SHARED,
+    persisted view-state set is used so the Roku and every browser converge on the same layers."""
+    allset = set(mapgen.ALL_LAYERS)
+    if not arg:
+        return (set(default_layers) & allset) or allset
+    want = set(s.strip() for s in arg.split(",") if s.strip()) & allset
+    return want or (set(default_layers) & allset) or allset
+
+
+def _next_waypoint(gps, wlist):
+    """The emphasised 'next' waypoint + distance for the status strip. Straight-line km always
+    (offline-safe); upgraded to road-km/ETA when the OSRM cache (waypoint-eta-refresh.py) is
+    fresh for this same waypoint."""
+    sel = waypoints_mod.select_next_waypoint(wlist, gps.get("lat"), gps.get("lon"))
+    if not sel:
+        return None
+    w, km = sel
+    out = {"id": w.get("id"), "name": w.get("name"), "type": w.get("type"),
+           "lat": w.get("lat"), "lon": w.get("lon"), "km": km}
+    rt = _wproute.get()
+    if (rt and rt.get("wpId") == w.get("id") and rt.get("road_km") is not None
+            and int(time.time()) - int(rt.get("computed_at", 0)) <= cfg.ROUTE_STALE_S):
+        out["km"] = rt["road_km"]
+        out["eta"] = rt.get("eta_epoch")
+    return out
+
+
+def _map_data(gps):
+    """Dynamic layers for the compositor (trail, waypoints + the emphasised next one, POI)."""
+    wdata = _waypoints.get()
+    return {
+        "trail": _trail.get(),
+        "waypoints": wdata,
+        "poi": _poi.get(),
+        "photoPoi": _photo_poi.get(),
+        "route": _route.get(),
+        "nextWaypoint": _next_waypoint(gps, wdata.get("waypoints") or []),
+    }
+
+
+@app.route("/api/map.png")
+def api_map():
+    """Server-composited ambient map PNG centred on live GPS."""
+    if not _MAP_OK:
+        abort(501)
+    gps = _cached_fix()
+    age, last_known, had_fix = _fix_age_and_last(gps)
+    center, zoom = _map_center_zoom(gps, last_known, request.args)
+    try:
+        w = int(request.args.get("w", cfg.MAP_W))
+        h = int(request.args.get("h", cfg.MAP_H))
+    except (ValueError, TypeError):
+        w, h = cfg.MAP_W, cfg.MAP_H
+    w = max(320, min(1920, w))
+    h = max(240, min(1080, h))
+    layers = _parse_layers(request.args.get("layers"), _view_state()["layers"])
+    tele = dict(gps)  # copy so the shared _cached_fix object is never mutated
+    tele["fix_age_s"] = age
+    tele["had_fix"] = had_fix
+    png = mapgen.render_map_png(center, zoom, w, h, layers, tele, _map_data(gps))
+    return Response(png, mimetype="image/png")
+
+
+# Browser viewer for the map PNG — an easy way to see the ambient map off the TV (phone/laptop
+# on SallyNet or over WireGuard) for troubleshooting + usage. Manual refresh; the zoom is a
+# per-request override, but the LAYER toggles POST to /api/view so the choice persists SERVER-SIDE
+# and every viewer + the Roku glass converge on the same layers. Requests the same 1920x1080 the
+# Roku does, so it shares the server render cache (no extra Pi load at rest).
+_MAP_HTML = """<!doctype html><html lang=en><head>
+<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Sally — Map</title><style>
+:root{--r:#c0392b}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:#11130f;font-family:system-ui,sans-serif;display:flex;flex-direction:column}
+#stage{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#11130f}
+#err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#e8dcc8;padding:20px;text-align:center}
+#bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:#1c1f26;color:#f0ece2;padding:10px 12px;font-size:.85rem;border-top:3px solid var(--r)}
+#go{background:var(--r);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:.95rem}
+#bar select{background:#2a2e36;color:#f0ece2;border:1px solid #444;border-radius:6px;padding:4px 6px}
+#bar label{white-space:nowrap}.L{vertical-align:middle}#ts{color:#9fa6b2;margin-left:auto;font-size:.78rem}
+</style></head><body>
+<div id=stage><img id=map alt="Sally map"><div id=err>Map didn't load — is sally-api up on :8090?</div></div>
+<div id=bar>
+<button id=go>↻ Refresh</button>
+<label>zoom <select id=z>
+<option value=auto>auto</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option>
+</select></label>
+<label><input type=checkbox class=L value=base> base</label>
+<label><input type=checkbox class=L value=trail> trail</label>
+<label><input type=checkbox class=L value=poi> poi</label>
+<label><input type=checkbox class=L value=photos> photos</label>
+<label><input type=checkbox class=L value=waypoints> waypts</label>
+<label><input type=checkbox class=L value=labels> labels</label>
+<label><input type=checkbox class=L value=status> status</label>
+<span id=ts>loading…</span>
+</div><script>
+var img=document.getElementById('map'),err=document.getElementById('err'),ts=document.getElementById('ts');
+function url(){
+ var z=document.getElementById('z').value;
+ return '/api/map.png?w=1920&h=1080&z='+z+'&v='+Date.now();  // layers come from shared /api/view
+}
+function load(){ts.textContent='loading…';
+ var pre=new Image();
+ pre.onload=function(){img.src=pre.src;err.style.display='none';
+  ts.textContent='loaded '+new Date().toLocaleTimeString()+' · '+pre.naturalWidth+'×'+pre.naturalHeight;};
+ pre.onerror=function(){err.style.display='flex';ts.textContent='load failed';};
+ pre.src=url();}
+function syncView(){
+ var ls=[].filter.call(document.querySelectorAll('.L'),function(c){return c.checked;})
+          .map(function(c){return c.value;}).join(',');
+ fetch('/api/view',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+   body:'layers='+encodeURIComponent(ls)}).then(function(){load();});
+}
+document.getElementById('go').onclick=load;
+document.getElementById('z').onchange=load;
+[].forEach.call(document.querySelectorAll('.L'),function(c){c.onchange=syncView;});
+fetch('/api/view').then(function(r){return r.json();}).then(function(d){
+ var on={};(d.layers||[]).forEach(function(l){on[l]=1;});
+ [].forEach.call(document.querySelectorAll('.L'),function(c){c.checked=!!on[c.value];});
+ load();
+}).catch(load);
+</script></body></html>"""
+
+
+@app.route("/map")
+def map_page():
+    """Browser viewer for the ambient map PNG (troubleshooting + off-TV usage)."""
+    return Response(_MAP_HTML, mimetype="text/html")
+
+
+# Trip waypoints editor (phone, on SallyNet WiFi). Canonical store is waypoints.json; the map
+# draws pins + emphasises the "next" one + counts it down in the status strip.
+_WAYPOINTS_HTML = """<!doctype html><html lang=en><head>
+<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>Sally — Waypoints</title><style>
+:root{--g:#d4a017;--r:#c0392b;--o:#e67e22;--ink:#2b2b2b}
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#faf7f0;color:var(--ink)}
+header{background:var(--g);padding:18px 16px;border-bottom:4px solid var(--r)}
+h1{margin:0;font-size:1.25rem}main{padding:16px;max-width:560px;margin:0 auto}
+label{display:block;margin:14px 0 4px;font-weight:600}
+input,select,button{width:100%;padding:12px;font-size:1rem;border:1px solid #ccc;border-radius:8px}
+button{background:var(--r);color:#fff;border:0;font-weight:700;margin-top:18px}button:disabled{opacity:.5}
+.row{display:flex;gap:8px;align-items:center;margin-top:10px}.row input[type=checkbox]{width:auto}
+.hint{color:#777;font-size:.85rem;margin-top:4px}
+.two{display:flex;gap:8px}.two>div{flex:1}
+#list{margin-bottom:6px}
+.wp{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #e3ddd0;border-radius:8px;padding:10px 12px;margin-bottom:6px}
+.wp.done{opacity:.55}.wp .n{font-weight:600}
+.wp .a button{width:auto;display:inline;padding:6px 10px;margin:0 0 0 6px;background:#777}
+.wp .a button.del{background:var(--r)}
+#out{margin-top:16px;padding:12px;border-radius:8px;display:none}.ok{background:#e8f5e9}.err{background:#fdecea}
+</style></head><body>
+<header><h1>🧭 Sally waypoints</h1></header><main>
+<div id=list>Loading…</div>
+<form id=f>
+<label>Name</label><input id=name placeholder="e.g. Nordegg fuel" required>
+<label>Type</label>
+<select id=type><option value=stop>Stop</option><option value=fuel>Fuel</option>
+<option value=camp>Camp</option><option value=scenic>Scenic</option></select>
+<div class=two><div><label>Latitude</label>
+<input id=lat type=text inputmode=decimal placeholder="e.g. 52.8734"></div>
+<div><label>Longitude</label>
+<input id=lon type=text inputmode=decimal placeholder="e.g. -118.0814"></div></div>
+<div class=hint>Type decimal lat/lon for an exact spot, or leave blank and use an option below.</div>
+<div class=row><input type=checkbox id=pin checked><label for=pin style="margin:0;font-weight:400">
+Pin Sally's current GPS as the location</label></div>
+<div class=row><input type=checkbox id=geo><label for=geo style="margin:0;font-weight:400">
+…or use my phone's location</label></div>
+<div class=row><input type=checkbox id=fav><label for=fav style="margin:0;font-weight:400">
+⭐ Save as a favourite place (not part of the route)</label></div>
+<div class=hint>Unchecked + a findable place name = look it up online.</div>
+<label>Notes (optional)</label><input id=notes placeholder="e.g. last cheap diesel">
+<button id=go type=submit>Add waypoint</button>
+</form><div id=out></div></main><script>
+var out=document.getElementById('out'),go=document.getElementById('go');
+function show(ok,msg){out.style.display='block';out.className=ok?'ok':'err';out.textContent=msg;}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function api(fd){return fetch('/api/waypoints',{method:'POST',body:fd});}
+function load(){fetch('/api/waypoints').then(r=>r.json()).then(d=>{
+ var ws=(d.waypoints||[]).slice().sort(function(a,b){return (a.order||0)-(b.order||0);});
+ var el=document.getElementById('list');
+ if(!ws.length){el.innerHTML='<p class=hint>No waypoints yet — add your first below.</p>';return;}
+ var ic={fuel:'⛽',camp:'🏕️',scenic:'🌄',stop:'📍'};
+ el.innerHTML=ws.map(function(w){
+  var icon=w.favourite?'⭐':(ic[w.type]||'📍');
+  var act=w.favourite
+   ?'<button data-p="'+w.id+'">➕ route</button>'
+   :'<button data-v="'+w.id+'" data-s="'+(w.visited?'0':'1')+'">'+(w.visited?'↺':'✓')+'</button>';
+  return '<div class="wp'+(w.visited?' done':'')+'">'+
+   '<span class=n>'+icon+' '+esc(w.name)+'</span>'+
+   '<span class=a>'+act+'<button class=del data-d="'+w.id+'">✕</button></span></div>';}).join('');
+ el.querySelectorAll('[data-d]').forEach(function(b){b.onclick=function(){
+  var fd=new FormData();fd.append('op','delete');fd.append('id',b.getAttribute('data-d'));api(fd).then(load);};});
+ el.querySelectorAll('[data-v]').forEach(function(b){b.onclick=function(){
+  var fd=new FormData();fd.append('op','visit');fd.append('id',b.getAttribute('data-v'));
+  fd.append('visited',b.getAttribute('data-s'));api(fd).then(load);};});
+ el.querySelectorAll('[data-p]').forEach(function(b){b.onclick=function(){
+  var fd=new FormData();fd.append('op','promote');fd.append('id',b.getAttribute('data-p'));api(fd).then(load);};});
+}).catch(function(){document.getElementById('list').textContent='Could not load waypoints.';});}
+load();
+document.getElementById('f').onsubmit=function(e){e.preventDefault();
+ var name=document.getElementById('name').value.trim();
+ if(!name){show(false,'Give the waypoint a name.');return;}
+ var fd=new FormData();fd.append('op','add');fd.append('name',name);
+ fd.append('type',document.getElementById('type').value);
+ fd.append('notes',document.getElementById('notes').value);
+ var la=document.getElementById('lat').value.trim(),lo=document.getElementById('lon').value.trim();
+ if(la&&lo){fd.append('lat',la);fd.append('lon',lo);}
+ if(document.getElementById('fav').checked)fd.append('favourite','1');
+ if(document.getElementById('pin').checked)fd.append('pin','1');
+ function send(){go.disabled=true;api(fd).then(r=>r.json()).then(function(d){go.disabled=false;
+   if(d.ok){show(true,'Added.');document.getElementById('name').value='';document.getElementById('notes').value='';load();}
+   else show(false,'Could not add: '+(d.error||'try again'));})
+   .catch(function(){go.disabled=false;show(false,'Network error — are you on SallyNet Wi-Fi?');});}
+ if(document.getElementById('geo').checked&&navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(function(p){fd.append('lat',p.coords.latitude);
+   fd.append('lon',p.coords.longitude);send();},function(){send();},{timeout:8000});
+ }else send();};
+</script></body></html>"""
+
+
+@app.route("/api/waypoints")
+def api_waypoints_get():
+    """The full waypoint list (the phone editor renders it; the map reads it each render)."""
+    data = _waypoints.get()
+    return jsonify({"schemaVersion": cfg.SCHEMA_VERSION,
+                    "waypoints": data.get("waypoints") or []})
+
+
+def _write_waypoints(wlist):
+    store.atomic_write_json(cfg.WAYPOINTS_JSON, {
+        "schemaVersion": cfg.SCHEMA_VERSION,
+        "waypoints": [_prune(w) for w in wlist],
+    })
+    _waypoints.invalidate()
+
+
+@app.route("/api/waypoints", methods=["POST"])
+def api_waypoints_post():
+    """Add / delete / toggle-visited / promote / favourite a waypoint. Location for an add comes
+    from an explicit lat/lon, the phone's GPS, Sally's current gpsd fix (pin=1), or geocoding the
+    name. A `favourite` is a saved place (no route order); `promote` turns one into a route stop."""
+    wlist = list(_waypoints.get().get("waypoints") or [])
+    op = request.form.get("op", "add")
+
+    if op == "delete":
+        wid = request.form.get("id", "")
+        _write_waypoints([w for w in wlist if w.get("id") != wid])
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True})
+
+    if op == "visit":
+        wid = request.form.get("id", "")
+        val = request.form.get("visited", "1") == "1"
+        for w in wlist:
+            if w.get("id") == wid:
+                w["visited"] = val
+                w["updatedTs"] = int(time.time())
+        _write_waypoints(wlist)
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True})
+
+    if op == "promote":  # a favourite becomes a route stop (gets an order, drops the flag)
+        wid = request.form.get("id", "")
+        nxt_order = max([w.get("order") or 0 for w in wlist] + [0]) + 1
+        for w in wlist:
+            if w.get("id") == wid:
+                w.pop("favourite", None)
+                w["order"] = nxt_order
+                w["visited"] = False
+                w["updatedTs"] = int(time.time())
+        _write_waypoints(wlist)
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True})
+
+    if op == "favourite":  # toggle an existing record to/from a (route-less) saved place
+        wid = request.form.get("id", "")
+        val = request.form.get("favourite", "1") == "1"
+        for w in wlist:
+            if w.get("id") == wid:
+                w["favourite"] = True if val else None
+                if val:
+                    w["order"] = None  # leaving the route
+                w["updatedTs"] = int(time.time())
+        _write_waypoints(wlist)
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True})
+
+    name = request.form.get("name", "").strip()
+    if not name:
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": False, "error": "name required"}), 400
+    wtype = request.form.get("type", "stop").strip().lower()
+    if wtype not in waypoints_mod.VALID_TYPES:
+        wtype = "stop"
+    lat, lon = _num(request.form.get("lat")), _num(request.form.get("lon"))
+    if (lat is None or lon is None) and request.form.get("pin"):
+        gps = _cached_fix()
+        if gps["fix"] and gps["lat"] is not None:
+            lat, lon = gps["lat"], gps["lon"]
+    if lat is None or lon is None:
+        geo = _geocode(name)
+        if geo:
+            lat, lon = geo
+    if lat is None or lon is None:
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": False,
+                        "error": "no location — pin GPS, allow phone location, or use a findable place name"}), 400
+
+    # A favourite is a saved place (no route order); a normal add gets the next order.
+    fav = request.form.get("favourite") in ("1", "true", "on")
+    order = None if fav else max([w.get("order") or 0 for w in wlist] + [0]) + 1
+    rec = {
+        "id": store.slug(name) + "-" + os.urandom(2).hex(),
+        "order": order, "name": name,
+        "lat": round(lat, 6), "lon": round(lon, 6),
+        "type": wtype, "visited": False,
+        "favourite": True if fav else None,
+        "arriveRadiusM": cfg.DEST_RADIUS_M,
+        "notes": request.form.get("notes", "").strip() or None,
+        "updatedTs": int(time.time()),
+    }
+    wlist.append(rec)
+    _write_waypoints(wlist)
+    return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True, "id": rec["id"]})
+
+
+@app.route("/waypoints")
+def waypoints_page():
+    """Mobile waypoint editor."""
+    return Response(_WAYPOINTS_HTML, mimetype="text/html")
+
+
+# Shared map view-state. A layer toggle made on /map persists here server-side, so every browser
+# AND the Roku glass (which fetches /api/map.png with no layers param) render the SAME layers.
+@app.route("/api/view")
+def api_view_get():
+    vs = _view_state()
+    return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "layers": vs["layers"],
+                    "baseSource": vs["baseSource"], "allLayers": sorted(_all_layers())})
+
+
+@app.route("/api/view", methods=["POST"])
+def api_view_post():
+    """Update the shared view-state. `layers` = CSV subset of the layer set; `baseSource` =
+    street|satellite (satellite reserved). Unknown names are dropped; an empty selection is
+    rejected so a viewer can't blank the Roku."""
+    allset = _all_layers()
+    cur = _view_state()
+    layers, base_source = cur["layers"], cur["baseSource"]
+    if "layers" in request.form:
+        want = [s.strip() for s in request.form["layers"].split(",") if s.strip() in allset]
+        if not want:
+            return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": False,
+                            "error": "select at least one layer"}), 400
+        layers = want
+    bs = request.form.get("baseSource")
+    if bs in ("street", "satellite"):
+        base_source = bs
+    store.atomic_write_json(cfg.VIEW_STATE_JSON, {
+        "schemaVersion": cfg.SCHEMA_VERSION, "layers": layers,
+        "baseSource": base_source, "updatedTs": int(time.time())})
+    _view.invalidate()
+    return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "ok": True,
+                    "layers": layers, "baseSource": base_source})
 
 
 def _file_ext(name):
@@ -794,7 +1284,7 @@ def api_fuel_log():
 
 @app.route("/api/state")
 def api_state():
-    gps = read_fix(cfg.GPSD_HOST, cfg.GPSD_PORT)
+    gps = _cached_fix()
     km_from_home = None
     if gps["fix"] and gps["lat"] is not None:
         km_from_home = round(
@@ -813,11 +1303,20 @@ def api_state():
             )
         trip_section = _trip_state(active, km_to_dest)
 
+    # GPS-loss alert — surfaced on every Roku screen via the existing alerts[] channel, not just
+    # the map overlay. Additive; _prune drops the empty list / null nav fields.
+    age, _lk, had = _fix_age_and_last(gps)
+    alerts = []
+    if not gps["fix"] and age is not None and age >= cfg.MAP_GPS_ALERT_AFTER_S:
+        alerts.append({"kind": "gps_lost", "sev": "warn",
+                       "text": "GPS signal lost", "ts": int(time.time())})
+
     payload = {
         "schemaVersion": cfg.SCHEMA_VERSION,
         "ts": int(time.time()),
         "mode": _derive_mode(gps, km_from_home, km_to_dest),
         "gps": gps,
+        "nav": {"secondsSinceFix": age, "hadFix": had},
         "trip": trip_section,   # omitted (pruned) when no active trip
         "fuel": _fuel_state(),  # omitted (pruned) when no fill-ups logged
         "drive": {
@@ -832,7 +1331,7 @@ def api_state():
         "level": None,    # P2
         "cameras": None,  # P3 — go2rtc /api/discovery
         "audio": None,    # P4
-        "alerts": [],
+        "alerts": alerts,
         "system": {
             "host": cfg.HOSTNAME,
             "uptime_s": int(time.time() - _BOOT),
@@ -862,8 +1361,8 @@ def index():
         "endpoints": [
             "/api/state", "/api/discovery", "/api/health",
             "/api/media?type=trips", "/api/collections/<id>", "/api/photos",
-            "/media/<path>", "/api/qr.png", "/api/upload", "/upload",
-            "/trip", "/api/trip", "/fuel", "/api/fuel-log",
+            "/media/<path>", "/api/qr.png", "/api/map.png", "/map", "/api/view", "/api/upload",
+            "/upload", "/trip", "/api/trip", "/api/waypoints", "/waypoints", "/fuel", "/api/fuel-log",
         ],
     })
 

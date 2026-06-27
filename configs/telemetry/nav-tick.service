@@ -1,0 +1,20 @@
+[Unit]
+Description=SallyNet nav-tick — GPS liveness + last-known position -> nav-state.json (always-on heartbeat)
+After=gpsd.socket sally-api.service
+Wants=gpsd.socket
+
+[Service]
+Type=simple
+User=pi
+# License-gated tile pre-warm — only when the tile plan PERMITS proactive fetching:
+#   Environment=NAV_PREWARM=1
+# Imports navstate + gpsd_client from the deployed sally-api; override if relocated:
+#   Environment=SALLY_API_DIR=/opt/sally/sally-api
+ExecStart=/usr/bin/python3 /opt/sally/media/nav-tick.py
+Restart=on-failure
+RestartSec=5
+# Lowest priority — a liveness heartbeat must never compete with gpsd / the renderer.
+Nice=15
+
+[Install]
+WantedBy=multi-user.target

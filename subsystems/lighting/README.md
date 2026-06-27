@@ -18,6 +18,10 @@ References:
 - [WLED Wiring Pro Tips](https://kno.wled.ge/advanced/wiring/)
 - [WLED 12V van setup thread](https://wled.discourse.group/t/help-for-12v-van-setup/10622)
 
+> These are ESP32 nodes too, but run **WLED** firmware (not the ESPHome sensor stack). They share
+> the 12V→5V buck + level-shifter + fused-feed recipe with the sensor fleet
+> ([`../telemetry/esp-fleet.md`](../telemetry/esp-fleet.md)) and bridge to the same MQTT broker.
+
 ## Zones (proposed)
 
 | Zone | Strip length | ESP32 location | Notes |

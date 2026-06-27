@@ -68,3 +68,83 @@ LAN_BASE_URL = os.environ.get("LAN_BASE_URL", "http://192.168.2.216:8090")
 UPLOAD_MAX_BYTES = int(os.environ.get("UPLOAD_MAX_BYTES", str(8 * 1024 * 1024 * 1024)))
 UPLOAD_VIDEO_EXT = set("mp4 mov m4v mkv avi 3gp 3g2 webm mts m2ts wmv flv".split())
 UPLOAD_PHOTO_EXT = set("jpg jpeg png heic heif webp tif tiff bmp gif".split())
+
+# --- ambient map / navigation (P2 — subsystems/gps/map-navigation-brainstorm.md) ------
+# The compositor (mapgen.py) bakes one flat PNG served at /api/map.png; the Roku just shows
+# it. Basemap tiles come from a raster provider (Thunderforest Outdoors by default — the OSM
+# public tile server forbids the caching/pre-seed this design needs). NOTE: Thunderforest's FREE
+# Hobby tier also forbids server-side caching/pre-seed (Small Business+ or a custom plan is
+# required) — the cache-forever design assumes that paid/custom arrangement; the tiles.py
+# breaker/negative-cache keeps rates polite meanwhile. Put
+# the key in TILE_API_KEY via the systemd unit / env; the template is .format()ed with
+# z/x/y/key. With no key the basemap degrades to gap-fill and only the LOCAL layers (Sally's
+# arrow, breadcrumb trail, waypoints, POI) draw — so the screen still works offline.
+TILE_URL_TEMPLATE = os.environ.get(
+    "TILE_URL_TEMPLATE",
+    "https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey={key}")
+TILE_API_KEY = os.environ.get("TILE_API_KEY", "")
+# Tile cache lives on the HDD (bulky + disposable; the wrong profile for the wear-sensitive
+# SD). The HDD has a failing band — every tile read/write is best-effort, so an I/O error
+# just becomes a cache miss -> live re-fetch and never crashes a render.
+TILE_CACHE_DIR = os.environ.get("TILE_CACHE_DIR", "/mnt/usb/home/maptiles")
+TILE_ATTRIBUTION = os.environ.get(
+    "TILE_ATTRIBUTION", "(C) OpenStreetMap contributors  (C) Thunderforest")
+
+# GPS breadcrumb tracks (daily YYYY-MM-DD.gpx written by scripts/media-track-logger.py).
+# MUST match that script's DEPLOYED TRACKS_DIR or today's trail silently renders empty.
+TRACKS_DIR = os.environ.get("TRACKS_DIR", "/var/lib/sally/tracks")
+
+# Canonical trip waypoints (phone-edited at /waypoints, re-read each render) + the POI
+# snapshot cache (scripts/poi-refresh.py from Overpass). SD + atomic, like the other stores.
+WAYPOINTS_JSON = os.environ.get("WAYPOINTS_JSON", "/var/lib/sally/waypoints.json")
+# Road-km/ETA to the next waypoint (OSRM), written by scripts/waypoint-eta-refresh.py — same
+# shape as route.json. The map prefers this over straight-line km when it's fresh.
+WAYPOINT_ROUTE_JSON = os.environ.get("WAYPOINT_ROUTE_JSON", "/var/lib/sally/waypoint-route.json")
+POI_CACHE_JSON = os.environ.get("POI_CACHE_JSON", "/var/lib/sally/poi-cache.json")
+OVERPASS_URL = os.environ.get("OVERPASS_URL", "https://overpass-api.de/api/interpreter")
+
+# Shared, persisted map view-state (layer visibility + a reserved base-source selector). Written
+# by POST /api/view, read by /api/map.png so every browser AND the Roku glass render identically.
+VIEW_STATE_JSON = os.environ.get("VIEW_STATE_JSON", "/var/lib/sally/view-state.json")
+
+# Background nav-tick (scripts/nav-tick.py, a Type=simple daemon reading gpsd ~every 7 s): GPS
+# liveness + frozen last-known position written to nav-state.json, the source of truth for the
+# /api/map.png GPS-loss overlay's fix-age. The API treats a nav-state older than NAV_STATE_STALE_S
+# as absent and falls back to its own in-process fix tracker. The tick's own cadence/write-gate/
+# pre-warm knobs (NAV_TICK_INTERVAL_S, NAV_HEALTHY_WRITE_S, NAV_MOVE_WRITE_M, NAV_PREWARM) are read
+# by the script from env (like the other workers).
+NAV_STATE_JSON = os.environ.get("NAV_STATE_JSON", "/var/lib/sally/nav-state.json")
+NAV_STATE_STALE_S = float(os.environ.get("NAV_STATE_STALE_S", "30"))
+
+# Past-trip geotagged photos surfaced as map pins (the "photos" layer). photo-poi.json is rebuilt
+# by media-reindex.py (piggybacked on the catalog rebuild). PHOTO_POI_MAX_KM is a hard great-circle
+# cull so a far-away trip's photo never bleeds onto the map at low zoom.
+PHOTO_POI_JSON = os.environ.get("PHOTO_POI_JSON", "/var/lib/sally/photo-poi.json")
+PHOTO_POI_MAX_KM = float(os.environ.get("SALLY_PHOTO_POI_MAX_KM", "40"))
+
+# Render settings. The font + any sprites live beside the code (a minimal Buster may lack
+# system fonts, so mapgen loads the .ttf by ABSOLUTE path). 1080p native; drop to 1280x720
+# (the Roku Poster upscales) via env if the Pi runs hot. The two cache windows stop the Pi
+# re-rendering identical frames for every Roku poll: a render is reused for MIN_RENDER_INTERVAL
+# while moving, and up to PARKED_TTL while parked (center/zoom/layers unchanged).
+_HERE = os.path.dirname(os.path.abspath(__file__))
+MAP_SPRITE_DIR = os.environ.get("MAP_SPRITE_DIR", os.path.join(_HERE, "mapassets"))
+MAP_FONT_PATH = os.environ.get("MAP_FONT_PATH", os.path.join(MAP_SPRITE_DIR, "DejaVuSans.ttf"))
+MAP_W = int(os.environ.get("MAP_W", "1920"))
+MAP_H = int(os.environ.get("MAP_H", "1080"))
+MAP_MIN_RENDER_INTERVAL_S = float(os.environ.get("MAP_MIN_RENDER_INTERVAL_S", "3"))
+MAP_PARKED_TTL_S = float(os.environ.get("MAP_PARKED_TTL_S", "20"))
+# GPS-loss safety overlay: bake a banner onto /api/map.png once a fix has been missing this long.
+MAP_GPS_ALERT_AFTER_S = float(os.environ.get("SALLY_GPS_ALERT_AFTER_S", "20"))
+
+# Tile-fetch hardening (keep request rates under control with a slow/throttling provider).
+# A failed tile is "cooled" (negative cache) so the next render skips straight to gap-fill
+# instead of re-hitting it; the GLOBAL breaker trips after a burst of failures (or a 429) and
+# serves cache-only for a cooldown so a tarpitting provider is left to recover; a single probe
+# after the cooldown re-closes it. All env-tunable. (See mapoptimize.md.)
+TILE_TIMEOUT_S = float(os.environ.get("TILE_TIMEOUT_S", "4"))            # per-tile HTTP timeout
+TILE_FAIL_COOLDOWN_S = float(os.environ.get("TILE_FAIL_COOLDOWN_S", "60"))  # negative-cache TTL
+TILE_BREAKER_FAILS = int(os.environ.get("TILE_BREAKER_FAILS", "6"))     # fails in window -> trip
+TILE_BREAKER_WINDOW_S = float(os.environ.get("TILE_BREAKER_WINDOW_S", "20"))
+TILE_BREAKER_COOLDOWN_S = float(os.environ.get("TILE_BREAKER_COOLDOWN_S", "45"))
+TILE_FETCH_WORKERS = int(os.environ.get("TILE_FETCH_WORKERS", "8"))     # concurrent tile fetches

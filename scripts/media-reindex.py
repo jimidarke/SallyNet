@@ -34,6 +34,8 @@ CATALOG_JSON = os.environ.get("CATALOG_JSON", "/var/lib/sally/catalog.json")
 # Canonical trip store (SD card) written by sally-api's trip-entry form. Source of
 # truth for trip metadata; wins over the legacy per-collection HDD trip.json files.
 TRIPS_JSON = os.environ.get("TRIPS_JSON", "/var/lib/sally/trips.json")
+# Past-trip geotagged photos -> map pins (read by sally-api's "photos" map layer).
+PHOTO_POI_JSON = os.environ.get("PHOTO_POI_JSON", "/var/lib/sally/photo-poi.json")
 
 
 def media_url(relpath):
@@ -158,6 +160,28 @@ def build(sidecars, trips):
     }
 
 
+def build_photo_poi(photos):
+    """Flatten catalog photos that carry a GPS fix into map pins, deduped to ~11 m so a photo
+    burst at one spot becomes a single pin (the renderer's POI_CAP handles the rest). Built here,
+    piggybacked on the catalog rebuild, since the catalog only changes on media ingest."""
+    out, seen = [], set()
+    for p in photos:
+        g = p.get("gps") or {}
+        lat, lon = g.get("lat"), g.get("lon")
+        if lat is None or lon is None:
+            continue
+        key = (round(lat, 4), round(lon, 4))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"lat": round(lat, 6), "lon": round(lon, 6),
+                    "title": p.get("title"),
+                    "thumbUrl": p.get("poster") or p.get("url"),
+                    "collectionId": p.get("collectionId"),
+                    "capturedTs": p.get("captureDatetime")})
+    return {"schemaVersion": 1, "generated": int(time.time()), "photos": out}
+
+
 def prune(obj):
     if isinstance(obj, dict):
         return {k: prune(v) for k, v in obj.items() if v is not None}
@@ -166,20 +190,26 @@ def prune(obj):
     return obj
 
 
-def main():
-    catalog = prune(build(load_sidecars(), load_trip_meta()))
-    os.makedirs(os.path.dirname(CATALOG_JSON) or ".", exist_ok=True)
-    lock = CATALOG_JSON + ".lock"
+def _atomic(path, obj):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    lock = path + ".lock"
     with open(lock, "w") as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
-        tmp = CATALOG_JSON + ".tmp"
+        tmp = path + ".tmp"
         with open(tmp, "w") as f:
-            json.dump(catalog, f, indent=2, sort_keys=True)
-        os.replace(tmp, CATALOG_JSON)  # atomic
+            json.dump(obj, f, indent=2, sort_keys=True)
+        os.replace(tmp, path)  # atomic
         fcntl.flock(lf, fcntl.LOCK_UN)
-    n = len(catalog["collections"])
-    print("reindexed %d collection(s), %d photo(s) -> %s"
-          % (n, len(catalog["photos"]), CATALOG_JSON))
+
+
+def main():
+    catalog = prune(build(load_sidecars(), load_trip_meta()))
+    _atomic(CATALOG_JSON, catalog)
+    photo_poi = prune(build_photo_poi(catalog["photos"]))
+    _atomic(PHOTO_POI_JSON, photo_poi)
+    print("reindexed %d collection(s), %d photo(s), %d photo-poi -> %s"
+          % (len(catalog["collections"]), len(catalog["photos"]),
+             len(photo_poi["photos"]), PHOTO_POI_JSON))
 
 
 if __name__ == "__main__":

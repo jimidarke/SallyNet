@@ -10,6 +10,10 @@ WorkingDirectory=/opt/sally/sally-api
 ExecStart=/usr/bin/python3 /opt/sally/sally-api/app.py
 Restart=on-failure
 RestartSec=3
+# Runtime secrets + host overrides (TILE_API_KEY for the map tiles, etc.). Written by
+# scripts/deploy-sally-api.sh from the repo .env; '-' means start fine if it's absent. Lives
+# OUTSIDE the rsync'd app dir so `rsync --delete` never removes it.
+EnvironmentFile=-/opt/sally/sally-api.env
 # Override the home anchor / port here if needed:
 # Environment=SALLY_HOME_LAT=53.5461 SALLY_HOME_LON=-113.4938 SALLY_API_PORT=8090
 

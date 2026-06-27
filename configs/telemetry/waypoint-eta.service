@@ -1,0 +1,13 @@
+[Unit]
+Description=SallyNet waypoint ETA refresher (OSRM road route + arrival auto-advance -> waypoint-route.json)
+After=network-online.target sally-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+# Imports the canonical next-waypoint logic from the deployed sally-api; override if relocated:
+# Environment=SALLY_API_DIR=/opt/sally/sally-api OSRM_URL=http://10.66.12.x:5000/route/v1/driving
+ExecStart=/usr/bin/python3 /opt/sally/media/waypoint-eta-refresh.py
+# Gentle — one short HTTP call; never compete with gpsd/sally-api.
+Nice=10

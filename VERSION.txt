@@ -1,6 +1,23 @@
-0.5.0
+0.6.0
 
 ## Changelog
+
+### 0.6.0 (2026-06-27)
+- **Map interface — layered on-demand PNG + shared web control (built, TDD'd; 94 tests green).** Extends the P1–P5 ambient map per `mapoptimize.md`. All **additive** to the frozen `/api` contract (no `schemaVersion` bump). The PNG is generated on demand per `/api/map.png` (single-flight cached), tuned for highway/city driving — not streamed.
+- **Shared view-state:** new `view-state.json` + `GET/POST /api/view`. `/api/map.png` with no `?layers=` now renders the shared layer set, so a toggle on the `/map` page persists server-side and **every browser + the Roku glass converge** — zero Roku edits (it already sends no `layers`). `/map` rewritten to load/POST `/api/view`.
+- **GPS-loss safety overlay:** an always-on banner baked onto the PNG once a fix is missing past `SALLY_GPS_ALERT_AFTER_S`; the map **freezes at the last-known position** instead of teleporting home; also surfaced on every Roku screen via `/api/state.alerts` (`gps_lost`) + a new `nav` block. Backed by a new always-on `nav-tick` daemon (`scripts/nav-tick.py` + `navstate.py`, gpsd-direct, SD-sparing write-gate) so loss is detected even when nobody polls.
+- **Photo POIs:** past-trip geotagged photos surface as camera pins near the current position — new `photos` layer; `photo-poi.json` built by `media-reindex.py` (piggybacked on the catalog rebuild, no new timer); POI-style declutter + a hard `PHOTO_POI_MAX_KM` great-circle cull.
+- **Favourites:** a `favourite` flag on the existing `waypoints.json` (manual decimal lat/lon entry on `/waypoints`, gold-star markers), **excluded from the route** by a one-line `select_next_waypoint` filter that covers both the map's "next" and the arrival auto-advance; `op=promote` turns a favourite into a route stop.
+- **Tile-fetch hardening (good-citizen throttle):** negative cache + global circuit breaker + 429/Retry-After honoring + tighter timeout + a `throttled` status chip, all in `tiles.py`.
+- **⚠️ Vendor-compliance correction:** documented that Thunderforest's *free* Hobby/Solo tiers FORBID the server-side caching + pre-seed this design relies on (Small Business+ / custom plan required — being arranged); corrected `mapoptimize.md`, `map-navigation-brainstorm.md`, and code comments. Satellite (EOX Sentinel-2 cloudless) deferred, but the `baseSource` hook is reserved.
+- New unit `configs/telemetry/nav-tick.service` (a `Type=simple` daemon, not a timer); `deploy-media-worker.sh` ships + enables it. New test modules: `test_view`, `test_navstate`, `test_maproute`, `test_waypoints_api`, `test_photopoi` (+ extensions to `test_tiles`/`test_mapgen`/`test_waypoints`).
+
+### 0.5.1 (2026-06-27)
+- **ESP sensor fleet — plan consolidated (docs only).** New `subsystems/telemetry/esp-fleet.md` is the single source of truth for every ESP32 sensor/input node: shared conventions (ESPHome-default firmware, `sally/telemetry/<area>/…` MQTT shape, broker host in `secrets.yaml`, 12V→5V buck + TVS, secrets-as-templates), the 8-node catalog (cabin-env → env satellites → fireside → tanks → power → fuel-keypad → backseat-eta → city-water), a topic→`/api/state` map, and a build order with physical gates.
+- Folded in three new ideas (2026-06-27 Q&A): a **portable fireside node** (temp+humidity only, 18650 + deep-sleep), a **back-seat "are we there yet?" ETA** button (glass consumer of `/api/state`, no contract change), and **machine-state** sensing — most of which **derives from the already-planned power & tank nodes** (Tier-2 hall clamps ⇒ pump/furnace run-state + shore presence; fresh-tank level trend ⇒ fresh-fill), so only two standalone nodes are net-new.
+- **Schema lock:** standardized every node on `sally/telemetry/<area>/…` and flagged the `sally/<subsystem>/…` drift in older notes (anything outside `sally/telemetry/+` falls out of `telemetry-logger.sh`'s subscription).
+- `/api/state` gains one **additive** `systems {pump, furnace, city_water}` block (omit-not-null, no `schemaVersion` bump); `env` stays flat for the Roku tile while the collector keeps per-node detail in SQLite. Documented in `subsystems/media/api-contract.md`.
+- `mastertodo.md` C4 rewritten from a one-line stub into the tracked node catalog; P2 + `subsystems/{telemetry,tanks,power,lighting}/README.md` cross-linked to the fleet doc. No firmware / collector / API **code** landed — that's the next push.
 
 ### 0.5.0 (2026-06-27)
 - **Trip entry + 4-state GPS mode + fuel logger — built and verified (Flask test-client end-to-end).** Closes `mastertodo.md` C2 + C3.

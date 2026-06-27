@@ -5,6 +5,7 @@ sub init()
     m.home = m.top.findNode("home")
     m.drive = m.top.findNode("drive")
     m.camp = m.top.findNode("camp")
+    m.map = m.top.findNode("map")
     m.media = m.top.findNode("media")
     m.vod = m.top.findNode("vod")
     m.photos = m.top.findNode("photos")
@@ -86,6 +87,7 @@ sub routeState(s as object)
     m.home.state = s
     m.drive.state = s
     m.camp.state = s
+    m.map.state = s
     applyMode(s)
 end sub
 
@@ -142,6 +144,7 @@ sub go(route as string)
     m.home.visible = (route = "home")
     m.drive.visible = (route = "drive")
     m.camp.visible = (route = "camp")
+    m.map.visible = (route = "map")
     m.media.visible = (route = "media")
     m.vod.visible = (route = "vod")
     m.photos.visible = (route = "photos")
@@ -154,6 +157,8 @@ sub go(route as string)
         m.drive.setFocus(true)
     else if route = "camp" then
         m.camp.setFocus(true)
+    else if route = "map" then
+        m.map.setFocus(true)
     else if route = "media" then
         m.media.setFocus(true)
     else if route = "photos" then
@@ -174,6 +179,7 @@ function routeParent(route as string) as string
     if route = "qr" then return m.qrParent
     if route = "drive" then return "home"
     if route = "camp" then return "home"
+    if route = "map" then return "home"
     return "home"
 end function
 
@@ -188,6 +194,8 @@ sub onHomeSelect()
         go("drive")
     else if r = "camp" then
         go("camp")
+    else if r = "map" then
+        go("map")
     else if r = "media" then
         m.list.control = "RUN"
         go("media")

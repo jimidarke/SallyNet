@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh the SallyNet POI snapshot as Sally moves
+
+[Timer]
+# Fire 2 min after boot, then every 5 min. The script no-ops unless Sally has moved
+# >POI_MOVE_KM (10) or the snapshot is older than POI_MAX_AGE_S (45 min), so a frequent
+# tick keeps POI fresh on a drive without ever hammering Overpass.
+OnBootSec=120
+OnUnitActiveSec=300
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

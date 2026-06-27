@@ -18,7 +18,9 @@ Roku code edits.
 | `/api/state` | GET | **live (P0)** | full snapshot — the heartbeat the Roku polls |
 | `/api/discovery` | GET | stub (P3) | `{schemaVersion, host, streams:{}}` — camera stream URLs |
 | `/api/health` | GET | **live (P0)** | `{ok, gps_fix, ts}` quick liveness |
-| `/api/map.png?z=&w=&h=` | GET | P2 | offline‑rendered PNG centered on current GPS |
+| `/api/map.png?w=&h=&z=&layers=&v=` | GET | **live (P2)** | server‑composited ambient map PNG centered on live GPS (basemap + breadcrumb trail + heading arrow + status strip) |
+| `/map` | GET | **live (P2)** | browser viewer for the map PNG (manual refresh + zoom/layer toggles) — troubleshooting & off‑TV usage |
+| `/api/view` | GET·POST | **live** | shared map view-state — layer visibility (+ reserved `baseSource`); every browser AND the Roku glass render the same layers |
 | `/api/media?type=trips` | GET | **live (P1)** | home‑media collections (trips/drone/memories/unsorted) |
 | `/api/media?type=movies\|tv\|kids` | GET | reserved | studio library — empty `collections` until built |
 | `/api/collections/<id>` | GET | **live (P1)** | items (videos+photos) within one collection |
@@ -29,6 +31,17 @@ Roku code edits.
 | `/api/upload` · `/upload` | POST · GET | **live (P5)** | guest upload endpoint · mobile upload page |
 | `/api/trip` · `/trip` | GET·POST · GET | **live (C2)** | trip store (active trip) · create/end trip · mobile trip-entry page |
 | `/api/fuel-log` · `/fuel` | POST · GET | **live (C3)** | log a fill-up → `fuel-log.json` + `docs/fuel-log.md` · mobile fuel-entry page |
+| `/api/waypoints` · `/waypoints` | GET·POST · GET | **live (P2)** | trip waypoint pins (list · add/delete/toggle/favourite/promote) · mobile pin-editor page; drawn on `/api/map.png` |
+
+> **`/api/map.png` params** (all optional, additive — the server owns centre + zoom, so the
+> Roku can fetch with just `?w=&h=&v=`): `w`,`h` = canvas size; `z` = `auto` (speed-based band,
+> default) or a forced `10–15`; `layers` = CSV subset of
+> `base,trail,poi,photos,waypoints,labels,status` — **a one-off override**; with NO `layers` param
+> (the Roku case) the server renders the **shared `/api/view` state**, so every viewer converges;
+> `v` = cache-buster the Roku sets to the latest `state.ts` so the Poster re-fetches the changed
+> image (ignored by the render cache). An always-on **GPS-loss banner** is baked on when a fix has
+> been missing past `SALLY_GPS_ALERT_AFTER_S` (it is not a toggleable layer). No `schemaVersion`
+> bump — additive, and `/api/state` is unchanged. Design: `../gps/map-navigation-brainstorm.md`.
 
 ## `/api/state` schema (v1)
 
@@ -50,6 +63,7 @@ sections that are simply absent until their phase lands.
     "alt_m": 669.2, "sats": 12, "sats_visible": 15, "hdop": 0.65,
     "time": "2026-06-26T06:55:18.000Z"     // gps time (UTC)
   },
+  "nav": { "secondsSinceFix": 0, "hadFix": true },  // GPS liveness (nav-tick) — fix-age drives the map loss banner
   "drive": { "km_from_home": 0.0, "reverse": false },  // odo_km/trip_km omitted until available
   "trip": {                                // present only when a trip is ACTIVE (C2)
     "id": "jasper-run", "title": "Jasper Run",
@@ -64,13 +78,14 @@ sections that are simply absent until their phase lands.
     "last": { "date": "...", "odo_km": 142400.0, "litres": 88.0, "total": 136.4, "l_100km": 22.0 },
     "avg_l_100km": 21.4, "fills": 7
   },
-  "alerts": [],                            // [{ kind, sev, text, ts }]
+  "alerts": [],                            // [{ kind, sev, text, ts }] — e.g. {kind:"gps_lost",sev:"warn"} on signal loss
   "system": { "host": "campingpi", "uptime_s": 0, "throttled": "0x0" }
   // --- omitted until populated (never sent as null) ---
   //   "power":  { batt_v, batt_a, soc_pct, tte_h, shore, mains_w }   (P2)
   //   "tanks":  { fresh_pct, grey_pct, black_pct, propane_pct }      (P2)
   //   "env":    { in_c, out_c, engine_c, humidity, pressure_hpa }    (P2)
   //   "level":  { pitch_deg, roll_deg, level_ok }                    (P2)
+  //   "systems":{ pump, furnace, city_water }                        (P2, additive)
   //   "cameras":{ rearview, dashcam }                                (P3)
   //   "audio":  { source, fm_on }                                    (P4)
 }
@@ -94,8 +109,16 @@ sections that are simply absent until their phase lands.
   delta to the previous fill), `avg_l_100km` is the running mean over fills that have one.
 - `system.throttled` is `vcgencmd get_throttled` — the under‑voltage canary surfaced on the
   Systems screen.
-- Sensor blocks (`power`/`tanks`/`env`/`level`/`cameras`/`audio`) are **omitted** until their
-  phase fills them — never emitted as `null`.
+- Sensor blocks (`power`/`tanks`/`env`/`level`/`systems`/`cameras`/`audio`) are **omitted** until
+  their phase fills them — never emitted as `null`.
+- `env` is **flat** (one `in_c`/`out_c`/`engine_c`), populated from the canonical nodes
+  (`in_c` = cabin, `out_c` = the fixed outside/vent sensor, `engine_c` = the DS18B20 in the bay).
+  The telemetry collector keeps **every per-node reading** (bunk, the portable fireside `camp` node,
+  …) in SQLite for logging/Grafana; only these few surface here so the Roku tile stays simple.
+- `systems` carries non-invasive **machine-state booleans** the `power`/`tanks` blocks don't cover:
+  `pump`/`furnace` are derived from the power node's Tier-2 hall-clamp branch currents (current over
+  a threshold ⇒ running); `city_water` from an optional inlet pressure switch. Gas/propane is never
+  sensed here. Additive (no `schemaVersion` bump) — node detail in `subsystems/telemetry/esp-fleet.md`.
 
 ## Home media (P1/P5)
 

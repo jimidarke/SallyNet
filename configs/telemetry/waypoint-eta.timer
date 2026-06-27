@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh the SallyNet next-waypoint ETA every 60s
+
+[Timer]
+# Fire 95s after boot (let sally-api + gpsd settle), then every 60s. The script no-ops
+# cheaply when there's no fix or no unvisited waypoint, so a fixed cadence is fine.
+OnBootSec=95
+OnUnitActiveSec=60
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

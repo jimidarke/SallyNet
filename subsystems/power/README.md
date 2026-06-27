@@ -58,6 +58,11 @@ Once the wiring is honest, add real instrumentation:
 
 > Deeper design exploration (two-tier shunt+hall architecture, INA228 vs INA226 for coulomb counting, the low-side ground trap, distributed branch monitoring) lives in [`dc-monitoring-brainstorm.md`](dc-monitoring-brainstorm.md).
 
+> The house-power node's firmware / MQTT / power / secrets conventions follow the fleet contract in
+> [`../telemetry/esp-fleet.md`](../telemetry/esp-fleet.md) (node #4). Its **Tier-2 hall clamps double
+> as appliance run-state** (pump / furnace → `/api/state.systems`) and the **shore-power presence**
+> input (`power.shore`) — both sensed non-invasively, propane untouched.
+
 ## Safety
 
 - Fuse the positive sense wire **at the battery post** (Victron ships a 1A fuse — use it).

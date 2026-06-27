@@ -1,0 +1,13 @@
+[Unit]
+Description=SallyNet POI snapshot (Overpass: RV-essentials / fuel / scenic -> poi-cache.json)
+After=network-online.target sally-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+# Self-hosted Overpass / tuning go here:
+# Environment=OVERPASS_URL=http://10.66.12.x/api/interpreter POI_MOVE_KM=10 POI_BBOX_DEG=0.5
+ExecStart=/usr/bin/python3 /opt/sally/media/poi-refresh.py
+# Gentle — at most one bbox Overpass query, and the script self-rate-limits by distance + age.
+Nice=15

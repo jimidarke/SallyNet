@@ -30,7 +30,10 @@ References:
 
 1. ✅ GPS receiver in + `gpsd` serving a live 3D fix (2026-06-26).
 2. ✅ Exposed to the dashboard — `sally-api` `/api/state` reads gpsd; the SallyNet Roku channel polls it.
-3. (optional) Traccar for family location sharing — check the `homeController` estate for an instance, or skip in favour of the in-rig dashboard.
+3. ✅ **Ambient map / navigation screen (2026-06-27)** — server-composited `/api/map.png` (basemap +
+   breadcrumb trail + waypoint pins + POI + heading arrow + status strip) on a Roku `MapScreen`.
+   Design + resolved decisions: [`map-navigation-brainstorm.md`](map-navigation-brainstorm.md).
+4. (optional) Traccar for family location sharing — check the `homeController` estate for an instance, or skip in favour of the in-rig dashboard.
 
 ## Mode derivation (4-state, 2026-06-27)
 
@@ -43,7 +46,9 @@ hysteresis. Thresholds are env-tunable (`SALLY_DRIVING_KMH`, `SALLY_HOME_RADIUS_
 
 ## Next action
 
-gpsd is live and feeds the 4-state mode machine + trip ETA. **Maps/waypoints/POIs is the
-next GPS-adjacent push** — needs its own spec (offline OSM tile cache for dead zones;
-`/api/map.png` is already reserved). Traccar family location sharing stays a parallel
-option (check the `homeController` estate for an existing instance).
+gpsd is live and feeds the 4-state mode machine + trip ETA **and the ambient map** (built
+2026-06-27 — `/api/map.png` + Roku `MapScreen`; offline tile cache + waypoints + POIs all landed,
+see [`map-navigation-brainstorm.md`](map-navigation-brainstorm.md)). To light it up on the TV: set
+`TILE_API_KEY` on `campingpi` + run `scripts/deploy-sally-api.sh`, install the `waypoint-eta` /
+`poi-refresh` timers (`configs/telemetry/`), and sideload the Roku channel. Traccar family location
+sharing stays a parallel option (check the `homeController` estate for an existing instance).

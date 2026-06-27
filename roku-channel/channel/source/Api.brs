@@ -24,6 +24,9 @@ function snMediaItemUrl(p as dynamic) as string
     return snApiBase() + p
 end function
 
-function snMapUrl(w as integer, h as integer, z as integer) as string
-    return snApiBase() + "/api/map.png?w=" + w.toStr() + "&h=" + h.toStr() + "&z=" + z.toStr()
+' Ambient map PNG. The server picks centre (live GPS) + zoom (speed band), so the Roku passes
+' only its display size and `v` — a cache-buster (the /api/state `ts`) that forces the Poster to
+' re-fetch the changed image at this stable URL. The server's render cache ignores `v`.
+function snMapUrl(w as integer, h as integer, v as string) as string
+    return snApiBase() + "/api/map.png?w=" + w.toStr() + "&h=" + h.toStr() + "&v=" + v
 end function

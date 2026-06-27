@@ -1,8 +1,11 @@
 # Ambient Map / Navigation Screen — Design Brainstorm
 
-**Status:** Design captured 2026-06-27. Decided in a brainstorm pass; nothing built yet. This is
-the richer version of the `/api/map.png` P2 stub described in
-[`../media/api-contract.md`](../media/api-contract.md). Not yet phased into the Roku roadmap.
+**Status:** Designed 2026-06-27, **implemented the same day (P1–P5)**. Live at `/api/map.png`
+(now a real endpoint in [`../media/api-contract.md`](../media/api-contract.md)) with a Roku
+`MapScreen`. The sections below are the design of record; the open questions at the bottom are
+now resolved (see **Resolved** there). Implementation lives in
+`services/sally-api/{tiles,mapgen,trail,waypoints}.py`, `roku-channel/.../screens/MapScreen.*`,
+and the `scripts/{waypoint-eta-refresh,poi-refresh,map-preseed}.py` cadence/CLI jobs.
 
 **Builds on what's already live:** GPS + gpsd serve a 3D fix exposed at `/api/state.gps`
 (see [`README.md`](README.md)); the Pi already logs GPS breadcrumbs to `/var/lib/sally/tracks/`;
@@ -95,21 +98,32 @@ LTE gives mostly-available uplink; the design must survive multi-hour dead stret
 - The compositor reads the file each render; the **next** waypoint (by route order or proximity)
   is the one emphasized on the map and counted down in the status strip.
 
-## Open questions / later
+## Resolved (was: open questions)
 
-- **Tile source & licensing** — public OSM tile servers have usage policies; a self-hosted
-  renderer or a tile provider with an offline-cache-friendly license may be needed for the
-  pre-seed volume. Decide before heavy pre-seeding.
-- **Movement-based re-fetch cadence** — how far Sally must move before the Roku pulls a fresh PNG
-  (balance smoothness vs. LTE data vs. render load).
-- **"Next waypoint" logic** — strictly route-ordered, or nearest-unvisited? Affects the countdown.
-- **Pre-seed UX** — where the "cache this region" trigger lives (phone page button? CLI on the
-  brains host?).
-- **Phasing** — slot into the Roku roadmap (currently P0–P7); this is a natural P2 companion to
-  the leveling/systems work since it shares `/api/*.png` server-render infrastructure.
+- **Tile source & licensing** → **Thunderforest Outdoors raster tiles + API key** (the OSM public
+  server is deliberately NOT used). **Compliance correction (2026-06-27):** Thunderforest's *free*
+  Hobby plan (and the $125 Solo plan) **forbid server-side disk caching + pre-seeding** — those need
+  the Small Business tier ($255/mo) or a custom arrangement. So the "cache-forever + `map-preseed.py`"
+  design requires a **paid/custom Thunderforest plan** (being arranged); until that lands, the
+  tile-fetch hardening (`mapoptimize.md` — negative cache + circuit breaker + 429/Retry-After) keeps
+  request rates polite. Key lives in the gitignored `.env` → written to `/opt/sally/sally-api.env` by
+  `deploy-sally-api.sh`. PMTiles (self-rendered from OSM/ODbL) stays the documented N100-era
+  fully-offline + fully-compliant upgrade behind `tiles.fetch_tile()`.
+- **Movement-based re-fetch cadence** → the Roku re-fetches once per `/api/state` poll (~5 s),
+  cache-busted by `state.ts`; the server throttles real renders to ≤1 per `MAP_MIN_RENDER_INTERVAL_S`
+  (3 s) moving / `MAP_PARKED_TTL_S` (20 s) parked, so the LTE/render cost is bounded server-side.
+- **"Next waypoint" logic** → **route-ordered** (lowest `order`, unvisited), proximity
+  auto-advance within `arriveRadiusM` (handled by `waypoint-eta-refresh.py`), nearest-unvisited
+  fallback only when no `order` is set. Countdown is straight-line km, upgraded to OSRM road-km
+  when fresh.
+- **Pre-seed UX** → a **CLI** on the brains host: `scripts/map-preseed.py <bbox> [zmin zmax]`
+  (refuses pyramids over `PRESEED_MAX_TILES`, logging the estimate). A phone button can wrap it later.
+- **Phasing** → built as **P1 basemap+arrow+status → P2 trail → P3 waypoints+editor+countdown →
+  P4 POI → P5 offline polish+pre-seed**, all landed.
 
 ## Next action
 
-None scheduled — captured for later. When picked up: confirm a tile source that permits offline
-caching at the volume needed, then spec the `/api/map.png` compositor params and the GPX file
-schema before any Roku work.
+Done — feature shipped. Operational follow-ups: (1) set `TILE_API_KEY` on `campingpi` and deploy;
+(2) install the `waypoint-eta` + `poi-refresh` systemd timers (`configs/telemetry/`); (3) sideload
+the Roku channel and confirm the **Map** hub tile. Future polish: vector PMTiles for true offline
+on the N100; declutter tuning; a phone-page pre-seed trigger.

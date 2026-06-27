@@ -8,6 +8,11 @@ The 460 V8 is going to be thirsty no matter what (see `docs/about-sally.md`), bu
 
 Not built. Planning + parts inventory.
 
+> **ESP node contract:** the shared conventions for every ESP32 sensor/input node (firmware, MQTT
+> topic shape, broker, power, secrets) + the full node catalog + build order live in
+> [`esp-fleet.md`](esp-fleet.md). This README owns the fuel-economy *goal* and the Pi-hosted
+> collector pipeline; `esp-fleet.md` owns the node fleet.
+
 ## Inputs we can capture today
 
 | Signal | Source | Hardware | Notes |

@@ -8,7 +8,7 @@ sub init()
         { label: "Media",   route: "media",   enabled: true },
         { label: "Photos",  route: "photos",  enabled: true },
         { label: "Camp",    route: "camp",    enabled: true },
-        { label: "Cameras", route: "cameras", enabled: false },
+        { label: "Map",     route: "map",     enabled: true },
         { label: "Systems", route: "systems", enabled: false }
     ]
     for each d in defs

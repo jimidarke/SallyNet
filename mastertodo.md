@@ -104,7 +104,7 @@ execute as a batch once the plan is settled.
 **Phases:**
 - [x] **P0** — shell (Splash/Home/Drive + `/api/state` poll).
 - [~] **P1** — Media: home trips + photos + upload done; **Movies/TV = Workstream A**.
-- [ ] **P2** — Sensors + Camp/Systems (Pi-hosted, gated on power): Mosquitto + ~150-line collector + SQLite; ESP32 nodes — **belly** (tanks: CD4051 + reused 1980s probes), **cabin** (env BME280/AHT20/DS18B20 + IMU MPU-9250 for leveling/heading), **house** (12V INA226/shunt). Offline **`/api/map.png`** render + **`/api/level.png`** bubble + compass. Camp + Systems screens. Cabin **fuel logger** (node-door → `/api/fuel-log`).
+- [ ] **P2** — Sensors + Camp/Systems (Pi-hosted, gated on power): Mosquitto + ~150-line collector + SQLite; ESP32 nodes — **belly** (tanks: CD4051 + reused 1980s probes), **cabin** (env BME280/AHT20/DS18B20 + IMU MPU-9250 for leveling/heading), **house** (12V INA226/shunt). Offline **`/api/map.png`** render + **`/api/level.png`** bubble + compass. Camp + Systems screens. Cabin **fuel logger** (node-door → `/api/fuel-log`). **Node fleet contract + catalog: `subsystems/telemetry/esp-fleet.md` (tracked in C4).**
 - [ ] **P3** — N100 migration + Cameras: move services + HDD to the N100 (modern OS, current ffmpeg → HEVC, drops Buster workarounds); Pi → pure RetroPie; go2rtc USB capture → MJPEG rear-view + HLS dashcam; Cameras screen + Drive rear-view PIP (auto on `drive.reverse`).
 - [ ] **P4** — Audio: RF headphones (movie lip-sync) + BETS-1 FM (music); audio-status strip.
 - [x] **P5** — QR photos *(landed early as part of P1 home media)*.
@@ -133,15 +133,27 @@ execute as a batch once the plan is settled.
 ### C2 — Driver / navigator dashboard (trip entry) — BUILT (2026-06-27)
 - [x] A **navigator entry pad** (`/trip` mobile page → `POST /api/trip`) to enter **trip parameters**: destination, trip name, who came (names), start/end dates. Destination geocoded via Nominatim (LTE), with a **"pin current GPS"** offline fallback. Active trip stored on SD (`/var/lib/sally/trips.json`).
 - [x] Feeds **three** things now: (a) **auto-creates the Trip collection** (merged into `/api/media?type=trips` instantly, reconciled by `media-reindex.py`); (b) the **Drive screen** (To / ETA / Aboard) + new **Camp screen**; (c) the **`camping` geofence** (4th GPS mode — `at destination` vs generic `parked`).
-- ETA is **OSRM road-routing** (`scripts/trip-eta-refresh.py` 60 s timer → `route.json` cache), straight-line `km_to_dest` as the offline fallback. Maps/waypoints/POIs **deferred to their own spec** (offline OSM tile cache needs research).
+- ETA is **OSRM road-routing** (`scripts/trip-eta-refresh.py` 60 s timer → `route.json` cache), straight-line `km_to_dest` as the offline fallback.
+- [x] **Ambient map / navigation — BUILT (2026-06-27)**: server-composited `/api/map.png` (Thunderforest basemap + breadcrumb trail + waypoint pins + Overpass POIs + heading arrow + status strip), Roku `MapScreen`, phone `/waypoints` editor, `waypoint-eta`/`poi-refresh`/`map-preseed` jobs, offline tile cache + low-zoom gap-fill. Resolved its own spec: `subsystems/gps/map-navigation-brainstorm.md`.
 
 ### C3 — Fuel / gas-mileage log — BUILT (2026-06-27)
 - [x] **Driver entry pad** (`/fuel` mobile page, native numeric keypad → `POST /api/fuel-log`) records **odometer, litres, $/litre**; datetime (GPS UTC) + GPS location auto-stamped.
 - [x] Computes **L/100km + mpg(imp) + total cost**; dual sink `fuel-log.json` (SD) + `docs/fuel-log.md`; running average surfaced in `/api/state.fuel` + the Drive-screen footer. ESP32 door keypad+OLED stays the future hardware path (same endpoint).
 
-### C4 — Telemetry sensors (ESP32 fleet)
-- [ ] **18650-powered ESP32 + WiFi sensor nodes** around Sally — start with **temp + humidity** (BME280 / SHT / DHT), expand later. Publish via **MQTT → collector → `/api/state` `env` section → Roku Camp/Systems** (this is the P2 path).
-- [ ] Sensor-only nodes = WiFi is fine (no BT radio conflict like the Halloween project). Plan placements (cabin, fridge, outside, water bay…).
+### C4 — Telemetry sensors (ESP32 fleet) — PLAN CONSOLIDATED (2026-06-27)
+> **Canonical:** the full fleet contract (firmware / MQTT / broker / power / secrets) + node catalog
+> + topic→state map + build order live in `subsystems/telemetry/esp-fleet.md`. This is the tracker.
+- [ ] **Node 0 — cabin-env (`sally-01`):** DHT22 config already written (`configs/telemetry/cabin-temp-humidity.yaml`); **deploy first** (no new HW). Expands to BME280 + DS18B20 (engine bay) + MPU-9250 (leveling/heading).
+- [ ] **Collector** — `scripts/telemetry-collector.py` (MQTT → SQLite read-model) + systemd unit; sibling to the durable `telemetry-logger.sh`. Folds latest values into `/api/state.{env,tanks,power,level,systems}`.
+- [ ] **Node 1 — env satellites** (bunk, …): clone of node 0; temp/humidity "in a few spots".
+- [ ] **Node 2 — fireside-portable (`camp`):** temp+humidity only, 18650 + deep-sleep (battery-optimized); ESP-NOW→gateway is the noted upgrade path if WiFi range/battery disappoints. *(new 2026-06-27)*
+- [ ] **Node 3 — tanks:** CD4051 + reused 1980s probes → fresh/grey/black %; **fresh-fill = level trend**. *Gated on the tank-material photo.*
+- [ ] **Node 4 — power:** Tier-1 INA228 shunt (SoC) + Tier-2 hall clamps → **also pump/furnace run-state + shore presence**. *Gated on the 12V wiring diagnosis.*
+- [ ] **Node 5 — fuel-keypad:** 4×4 keypad + OLED @ driver door → `POST /api/fuel-log` (web `/fuel` already built).
+- [ ] **Node 6 — backseat-eta:** button + OLED, "are we there yet?" → GET `/api/state` ETA / km-to-dest. Glass consumer, no contract change. *(new 2026-06-27 — scoped to ETA only)*
+- [ ] **Node 7 — city-water switch (optional):** inline pressure switch → `systems.city_water`.
+- [ ] **Contract:** add additive `systems {pump,furnace,city_water}` block to `api-contract.md` (omit-not-null, no `schemaVersion` bump). `env` stays flat for the tile; collector keeps per-node detail in SQLite.
+- [?] **Schema lock:** every node publishes under `sally/telemetry/<area>/…` — retire the `sally/<subsystem>/…` drift (anything outside `sally/telemetry/+` falls out of the logger's subscription).
 
 ### C5 — Cameras (future version — some data already gathered)
 - [ ] Build on the gathered data for a later version. Ideas to exploit: backup-cam **live tile + GPS overlay** (driving mode, see B/P3), **auto rear-view on reverse** (`/api/state drive.reverse` already exists), **dashcam recording**, **motion snapshots**. Park as a future phase.
