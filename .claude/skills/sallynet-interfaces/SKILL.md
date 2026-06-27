@@ -96,8 +96,8 @@ or on demand) → dedup + encode (H.264 MP4 / JPEG + thumb) → library/<collect
 per-item sidecar → media-reindex.py rebuilds catalog.json (SD) → Roku MediaScreen shows it
 ```
 
-Currently the pipeline is built and verified end-to-end but **real uploads are blocked on
-the failing media HDD** — see [`sallynet-pi-ops`](../sallynet-pi-ops/SKILL.md).
+Currently the pipeline is built and verified end-to-end and now runs on the media SSD that
+replaced the old HDD — see [`sallynet-pi-ops`](../sallynet-pi-ops/SKILL.md).
 
 ## What people will use next (planned)
 

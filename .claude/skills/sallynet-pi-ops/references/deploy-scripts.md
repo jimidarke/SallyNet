@@ -35,7 +35,7 @@ single-connection base64 / scp** (lte-monitor, wg-watchdog — for over-the-tunn
      `media-encode.timer` (from `configs/media/`); `trip-eta`, `waypoint-eta`,
      `poi-refresh` `.service`+`.timer` (from `configs/telemetry/`).
   5. `daemon-reload && enable --now` the track-logger + all four timers.
-  6. create the HDD tree under `$MEDIA_HOME` (from `sally-media.conf`):
+  6. create the media tree under `$MEDIA_HOME` (from `sally-media.conf`):
      `{inbox,work,library/{trips,drone,memories,unsorted},originals,catalog/items,tracks,failed,logs}`.
 - **Verify:** `systemctl is-active media-track-logger`; `systemctl list-timers`.
   Drain inbox now: `sudo systemctl start media-encode.service`.

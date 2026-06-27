@@ -1113,9 +1113,9 @@ def api_trip_get():
 
 
 def _write_hdd_trip_json(rec):
-    """Best-effort mirror to the legacy HDD trips/<cid>/trip.json so the media pipeline
-    keeps its hand-editable per-collection file. The SD trips.json is canonical; a dead
-    HDD just means this no-ops."""
+    """Best-effort mirror to the media disk's trips/<cid>/trip.json so the media pipeline
+    keeps its hand-editable per-collection file. The SD trips.json is canonical; an
+    unmounted/full media disk just means this no-ops."""
     try:
         d = os.path.join(cfg.MEDIA_ROOT, "trips", rec["id"])
         os.makedirs(d, exist_ok=True)

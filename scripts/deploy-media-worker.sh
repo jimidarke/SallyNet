@@ -56,7 +56,7 @@ sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
    && sudo systemctl enable --now nav-tick.service \
    && sleep 1 && systemctl is-active media-track-logger.service nav-tick.service && systemctl list-timers media-encode.timer trip-eta.timer waypoint-eta.timer poi-refresh.timer --no-pager | head -6"
 
-header "ensuring HDD tree exists"
+header "ensuring media tree exists"
 sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
   "MEDIA_HOME=\$(. /opt/sally/media/sally-media.conf; echo \$MEDIA_HOME); \
    mkdir -p \$MEDIA_HOME/{inbox,work,library/{trips,drone,memories,unsorted},originals,catalog/items,tracks,failed,logs}"

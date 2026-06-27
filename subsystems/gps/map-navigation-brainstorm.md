@@ -61,7 +61,7 @@ gpsd ──► /api/state.gps ─┐
 tracks/ (breadcrumb) ────┤
 GPX waypoints file ──────┤──►  map compositor (brains host)  ──►  /api/map.png  ──►  Roku Poster
 POI cache (Overpass) ────┤        (basemap + layers → 1 PNG)
-OSM tile cache (HDD) ────┘
+OSM tile cache (SSD) ────┘
 ```
 
 - **`/api/map.png`** grows query params (additive, non-breaking): the existing `z`, `w`, `h` plus
@@ -77,7 +77,7 @@ LTE gives mostly-available uplink; the design must survive multi-hour dead stret
 *depending* on the modem.
 
 - **Live-fetch + permanent cache.** The compositor pulls OSM tiles over LTE when there's signal
-  and writes every tile to an HDD cache forever. Re-visiting anywhere already seen = free,
+  and writes every tile to an SSD cache forever. Re-visiting anywhere already seen = free,
   instant, no uplink.
 - **Optional trip pre-seed.** Before a leg with known dead zones (or any time on home wifi), a
   one-shot job caches the tile pyramid for a bbox around the planned route (zoom ~8–15). Nice to

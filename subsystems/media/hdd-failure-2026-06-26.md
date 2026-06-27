@@ -1,5 +1,12 @@
 # Media HDD failure — diagnosis (2026-06-26)
 
+> **✅ RESOLVED 2026-06-27 — the HDD was replaced with a Crucial BX500 1 TB SSD** (ext4, mounted at
+> `/mnt/usb` by UUID with `nofail`). The media library was **not migrated — it's re-encoded from
+> source**; the user's movies/TV were preserved on the SSD, and the SD-card read-models were
+> untouched. After the swap the Pi boots clean (`get_throttled = 0x0`). The diagnosis below is kept
+> as the historical record of the failure that prompted the swap. Current storage state:
+> `docs/current-state.md`.
+
 Findings from validating the photo-upload pipeline end-to-end for the first time on real
 data. Short version: **the pipeline software works (it failed safe); the HDD underneath it is
 physically failing.** SMART can't be read through the enclosure to grade exactly how bad.

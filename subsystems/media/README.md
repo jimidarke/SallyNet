@@ -37,14 +37,15 @@ The channel code now lives **in this monorepo at `roku-channel/`** (consolidated
 ## Phase 1 — Home media (trips / photos) · BUILT (2026-06-26)
 
 Home-made content (camping trips, family memories, drone footage) is browsable + playable on the
-Roku, served from the HDD via `sally-api`. Verified end-to-end on Camperoku (encode → catalog →
+Roku, served from the SSD via `sally-api`. Verified end-to-end on Camperoku (encode → catalog →
 API → channel renders the catalog, no errors) — that pass used a **generated test image**
 (artifacts since cleaned up, so the catalog currently reads 0/0).
 
-> **⚠️ 2026-06-26 — happy path now blocked on storage.** The first ingest of a *real* guest
-> upload failed: the HDD's bad band degraded to **write faults** and `library/unsorted/` is on
-> it. The pipeline failed safe (photo preserved in `home/failed/`). Back up + replace/format the
-> drive before re-verifying. Full diagnosis: `hdd-failure-2026-06-26.md`.
+> **✅ 2026-06-27 — storage blocker resolved.** The failing HDD was replaced with a **Crucial
+> BX500 1 TB SSD** (ext4, `/mnt/usb` by UUID). The media library was **not migrated — it's being
+> re-encoded from source** (catalog reset to 0/0); the user's movies/TV were preserved on the SSD.
+> The happy path can be re-verified with a real upload now. History of the failure that prompted
+> the swap: `hdd-failure-2026-06-26.md`.
 
 **One optimal format, encode-once** (the "gold standard"): MP4 H.264 **High@L4.2**, ≤1080p
 downscale-only (AR preserved, never upscaled), **CFR**, 2 s GOP, **CRF 20 + 12 Mbps cap**, AAC-LC
@@ -67,8 +68,8 @@ on a real Pi encode.
   `scripts/deploy-media-worker.sh`.
 
 **Storage:** `/mnt/usb/home/{inbox,work,library/{trips,drone,memories,unsorted},originals,catalog/items,failed,logs}`.
-Per-item sidecars (HDD) are the source of truth; `catalog.json` + breadcrumbs live on the Pi's SD
-card — crash-safe, and it dodges a **bad sector found on the HDD** (see `docs/current-state.md`).
+Per-item sidecars (on the media SSD) are the source of truth; `catalog.json` + breadcrumbs live on
+the Pi's SD card — crash-safe and independent of the media disk (see `docs/current-state.md`).
 
 **Guest upload:** `GET /upload` (mobile page) + `POST /api/upload` stream files into `inbox/`; the
 Roku **Photos → Info** shows `GET /api/qr.png`, so guests on SallyNet scan → upload from their phone

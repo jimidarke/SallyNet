@@ -45,9 +45,11 @@ procedure.
    tells you current throughput/signal (see [`sallynet-networking`](../sallynet-networking/SKILL.md)).
 3. **Know what you'll restart.** Each deploy script restarts specific units — don't
    bounce a service the user didn't ask about. The table says which.
-4. **Watch out for the failing HDD.** `/mnt/usb/home` (the exFAT media disk) has an
-   **unrecovered bad-sector band** — avoid heavy writes there; the crash-safe
-   read-models already live on the SD card (`/var/lib/sally`).
+4. **The media disk is an SSD now.** `/mnt/usb` is a Crucial BX500 1TB **ext4** SSD
+   (swapped in 2026-06-27, mounted by UUID with `nofail`; the old failing exFAT HDD is
+   gone). It's healthy — but the Pi's USB power budget is tight, so **don't add a second
+   bus-powered disk** (running two at once tripped a brown-out during the swap). The
+   crash-safe read-models still live on the SD card (`/var/lib/sally`).
 
 ## Deploy scripts
 
@@ -58,7 +60,7 @@ when you're on SallyNet WiFi).
 | Script | Auth / transport | Pushes → target | Restarts | Verify |
 |---|---|---|---|---|
 | `deploy-sally-api.sh` | `sshpass`+`PI_PASSWORD`, **rsync `--delete`** (multi-RTT) | `services/sally-api/` → `/opt/sally/sally-api/`; writes `/opt/sally/sally-api.env` (0600, `TILE_API_KEY`); installs `sally-api.service` | `sally-api.service` | `curl -s http://$PI:8090/api/health` (and `/api/state`) |
-| `deploy-media-worker.sh` | `sshpass`+`PI_PASSWORD`, rsync/scp | media scripts → `/opt/sally/media/`; conf only if absent; creates the HDD tree | `media-track-logger.service`, `media-encode.timer`, `trip-eta`/`waypoint-eta`/`poi-refresh` timers | `systemctl is-active media-track-logger`; `systemctl list-timers` |
+| `deploy-media-worker.sh` | `sshpass`+`PI_PASSWORD`, rsync/scp | media scripts → `/opt/sally/media/`; conf only if absent; creates the media tree | `media-track-logger.service`, `media-encode.timer`, `trip-eta`/`waypoint-eta`/`poi-refresh` timers | `systemctl is-active media-track-logger`; `systemctl list-timers` |
 | `deploy-lte-monitor.sh` | **key** `sally_campingpi`, **base64-inline single-connection** (tunnel-safe) | `lte-monitor.py` → `/opt/sally/net/`; env → `/etc/sally/lte-monitor.env` (0600) | `sally-lte-monitor.service` | `mosquitto_sub -t sally/telemetry/lte/state` |
 | `deploy-wg-watchdog.sh` | **key**, multi-hop scp (can stall under load) | `wg-watchdog.sh` → `/opt/sally/net/`; installs timer | `sally-wg-watchdog.timer` | manual run prints `ok (handshake …)` |
 
@@ -78,10 +80,12 @@ Per-script line-level detail: [`references/deploy-scripts.md`](references/deploy
 - `/opt/sally/media/` — pipeline scripts + `sally-media.conf`.
 - `/opt/sally/net/` — `lte-monitor.py`, `wg-watchdog.sh`.
 - `/var/lib/sally/` — **SD card**, atomic JSON read-models (crash-safe, *not* on the
-  failing HDD): `catalog.json`, `trips.json`, `route.json`, `waypoint-route.json`,
-  `waypoints.json`, `poi-cache.json`, `fuel-log.json`, `tracks/*.gpx`.
-- `/mnt/usb/home/` — **HDD** media library tree (`inbox work library/{trips,drone,
-  memories,unsorted} originals catalog/items maptiles failed logs`). ⚠️ failing disk.
+  media SSD): `catalog.json`, `trips.json`, `route.json`, `waypoint-route.json`,
+  `waypoints.json`, `poi-cache.json`, `view-state.json`, `fuel-log.json`, `tracks/*.gpx`.
+- `/mnt/usb/home/` — **media SSD** library tree (`inbox work library/{trips,drone,
+  memories,unsorted} originals catalog/items maptiles failed logs`); the `maptiles/`
+  basemap cache lives here too. Crucial BX500 1TB ext4, UUID-mounted; the user's
+  `movies/`+`tv/` (MiniDLNA) sit at the `/mnt/usb` top.
 - `/etc/sally/lte-monitor.env` (0600) · `/etc/wireguard/wg-home.conf` (site node).
 
 systemd units installed by the deploys: `sally-api`, `media-track-logger`,
@@ -104,7 +108,7 @@ journalctl -u sally-api.service -f             # live logs (swap unit name)
 # Drain the upload inbox now instead of waiting for 02:00
 sudo systemctl start media-encode.service
 
-# Preseed offline map tiles for a route corridor (HDD cache; bounded by PRESEED_MAX_TILES)
+# Preseed offline map tiles for a route corridor (SSD cache; bounded by PRESEED_MAX_TILES)
 python3 /opt/sally/media/map-preseed.py 52.0 -118.5 53.6 -116.0 8 14   # Jasper/Icefields
 
 # Health
@@ -112,19 +116,45 @@ curl -s http://$PI:8090/api/health | jq
 vcgencmd get_throttled                         # under-voltage canary (want 0x0)
 ```
 
+## The layered map (render pipeline on the Pi)
+
+`sally-api` bakes the dashboard map **server-side**: `mapgen.py` composites one flat PNG at
+`GET /api/map.png` (the Roku `MapScreen` and the phone browser both just display it — no
+client-side map engine). Layers stack over the basemap: **Sally's arrow**, the **breadcrumb
+trail** (`trail.py` from `tracks/*.gpx`), **waypoints** (`waypoints.py`), and **POIs**
+(`poi-cache.json`). Layer visibility + the base-source selector are shared state —
+`POST /api/view` → `/var/lib/sally/view-state.json`, re-read by `/api/map.png` so every
+browser and the Roku render identically.
+
+- **Basemap tiles** come from a raster provider (Thunderforest by default; `TILE_API_KEY`
+  lives in `/opt/sally/sally-api.env`) and cache **forever** on the SSD at
+  `/mnt/usb/home/maptiles`. With no key the basemap drops to gap-fill and only the local
+  layers draw — the screen still works offline.
+- `tiles.py` carries a negative-cache + circuit breaker so a slow/throttling provider (or an
+  LTE dead zone) degrades to cache-only instead of stalling a render; every tile read/write
+  is best-effort (an unmount → cache miss, never a crash). Pre-seed a corridor before a trip
+  with `map-preseed.py` (above) — after the 2026-06-27 disk swap the cache started empty.
+- The map's ETA/POI feeds are the `trip-eta` / `waypoint-eta` / `poi-refresh` timers writing
+  `route.json` / `waypoint-route.json` / `poi-cache.json` on the SD. `mapgen` reuses a
+  cached frame (`MAP_MIN_RENDER_INTERVAL_S` moving, `MAP_PARKED_TTL_S` parked) so Roku polls
+  don't re-render identical frames. Tuning detail: `mapoptimize.md`.
+
 ## Maintenance guardrails (and the why)
 
 - **Stay on Raspbian Buster — never `dist-upgrade`.** Buster is EOL; apt is repointed to
   `legacy.raspbian.org`. The media pipeline carries version-pinned ffmpeg 4.1 workarounds
   (`-vsync cfr`, `trunc(iw/2)*2`) and the services run on Python 3.7. An upgrade breaks
   ffmpeg, the gpsd build, and the stdlib-only scripts. The N100 is the real upgrade path.
-- **The media HDD is failing.** Seagate ST1000LM037 has an unrecovered-read band that has
-  degraded to write faults on some library dirs. Back up before heavy writes; tile reads
-  are best-effort (an I/O error becomes a cache miss, never a crash). Diagnosis:
-  `subsystems/media/hdd-failure-2026-06-26.md`. The SD read-models are the durable copy.
+- **The media disk is an SSD (swapped 2026-06-27).** `/mnt/usb` = Crucial BX500 1TB ext4,
+  UUID-mounted with `nofail`; the old failing Seagate exFAT HDD is gone. Tile/library I/O is
+  still best-effort (an unmount or error → cache miss, never a crash). The SSD's `home/`
+  library is **re-encodable from source, not backed up** — the SD read-models
+  (`/var/lib/sally`) are the durable copy. History: `subsystems/media/hdd-failure-2026-06-26.md`.
 - **Chronic under-voltage.** `vcgencmd get_throttled` has logged non-zero — a 12 V→5 V feed
   issue. It destabilizes the tunnel and timers; the power node deploy (#4) is itself gated
-  on getting this to `0x0`. Fix the feed (`subsystems/power/`), don't just paper over it.
+  on getting this to `0x0`. **Running two bus-powered disks at once will trip it** (a ~4 s
+  brown-out during the 2026-06-27 disk swap; a single SSD now boots clean at `0x0`). Fix the
+  feed (`subsystems/power/`), don't just paper over it.
 - **WiFi + BT are disabled; the Pi is wired-only.** This frees the PL011 UART for the
   router serial link and avoids the single-radio WiFi/BT time-slice conflict. Don't
   re-enable them while the Pi is the services host.

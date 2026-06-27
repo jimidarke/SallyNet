@@ -18,7 +18,7 @@ Each folder under `subsystems/` covers one functional area. Each one has a READM
 |---|---|
 | [`subsystems/network/`](subsystems/network/) | QX210-NW2 4G LTE router, WiFi-as-WAN, captive portal handling |
 | [`subsystems/media/`](subsystems/media/) | TV, HDMI selector, Roku (sideload target), USB/SD player |
-| [`subsystems/compute/`](subsystems/compute/) | Raspberry Pi 3B+ + ~1TB HDD + RetroPie + Samba/DLNA media server |
+| [`subsystems/compute/`](subsystems/compute/) | Raspberry Pi 3B+ + ~1TB SSD + RetroPie + Samba/DLNA media server |
 | [`subsystems/lighting/`](subsystems/lighting/) | WLED ambient lighting (ESP32 + WS2811 12V strips) |
 | [`subsystems/comms/`](subsystems/comms/) | FRS family radios, cell booster |
 | [`subsystems/gps/`](subsystems/gps/) | VK-162 USB GPS, gpsd, Traccar |

@@ -34,7 +34,7 @@ Sally is a **1985 Ford E-350 Econoline cutaway** with Okanagan Kelowna coachwork
 She's accumulated a bit of a tech stack. The short list:
 
 - **Pyle TV** with built-in DVD player + **AGPtek mini 1080** media player + **Roku** + **9" TFT 4-camera backup-cam head** (RCA video out) all routed through an HDMI input selector — main living-area entertainment + rolling rear vision
-- **Raspberry Pi 3B+** with 2× USB controllers + **~1TB USB HDD** (exFAT), RetroPie (quietly also a Samba + MiniDLNA media server)
+- **Raspberry Pi 3B+** with 2× USB controllers + **~1TB USB SSD** (ext4), RetroPie (quietly also a Samba + MiniDLNA media server)
 - **QX210-NW2** industrial 4G LTE WiFi router — the network backbone
 - **ANNTLENT Cell Phone Signal Booster** (Band 2/5/12/17) for Canadian carriers, directional roof antenna on a spire mount + indoor repeater
 - Rear panel with USB charge ports, voltage indicator, and **Uniden FRS** charging stations

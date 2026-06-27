@@ -5,7 +5,7 @@ writers) and app.py:_load_catalog (per-request mtime check for readers). Used by
 trip store, the OSRM route cache, and the fuel log so a concurrent writer (a POST
 handler, the ETA refresher) and the 5 s /api/state poll never see a half-written file.
 
-Everything lives on the Pi's LOCAL disk (SD), never the failing exFAT HDD.
+Everything lives on the Pi's LOCAL disk (SD), never the bulky/disposable media disk.
 """
 import fcntl
 import json

@@ -12,12 +12,12 @@ Notes on Sally's Raspberry Pi 3B+ (`campingpi`), captured 2026-06-25 from a live
 | Hardware | Raspberry Pi 3B+ (Rev 1.4, 4-core armv7l, 744 MB usable RAM after 256 MB GPU split; WiFi/BT disabled) |
 | OS | Raspbian GNU/Linux 10 (**Buster**), kernel 5.10.103-v7+, image base 2022-01-28 |
 | SSH | key-based — `ssh campingpi` (alias in `~/.ssh/config`, user `pi`, key `~/.ssh/sally_campingpi`) |
-| Storage | SD: 58 GB (14% used) holds OS + roms + saves. USB HDD: ~1 TB exFAT at `/mnt/usb` holds media |
+| Storage | SD: 58 GB (14% used) holds OS + roms + saves. USB SSD: 1 TB ext4 at `/mnt/usb` holds media |
 
 ### Services running (not "pure RetroPie")
 - **RetroPie 4.8** (EmulationStation + RetroArch) — roms on the SD card at `/home/pi/RetroPie/roms`
 - **Samba** (`:445`) — shares `[roms]`, `[bios]`, `[homes]`
-- **MiniDLNA "CampingNetMedia"** (`:8200`) — serves video from the HDD
+- **MiniDLNA "CampingNetMedia"** (`:8200`) — serves video from the SSD
 - **Flask "System Metrics"** (`:80`) — `/home/pi/web/app.py` (psutil host stats), runs as **root**, no auth, started by `web_app.service`
 
 ## DLNA media library (`/mnt/usb`)
@@ -88,7 +88,7 @@ Do these between game sessions; none touch the OS.
 
 ### Tier 2 — modernization (plan deliberately, back up first)
 - Fresh current image (Bookworm-based RPi OS + reinstall RetroPie via RetroPie-Setup).
-- **Migrate, with verified backups:** roms + saves (`.srm`/`.state`, on the SD not the HDD), scraped gamelists/art, RetroArch configs, **and** rebuild the custom layer — Samba shares, MiniDLNA config, Flask metrics service, WiFi/SSH key.
+- **Migrate, with verified backups:** roms + saves (`.srm`/`.state`, on the SD not the SSD), scraped gamelists/art, RetroArch configs, **and** rebuild the custom layer — Samba shares, MiniDLNA config, Flask metrics service, WiFi/SSH key.
 - Only worth the effort for newer cores/features or once Buster breakage bites. Treat as a planned project, not a quick update.
 
 **Pre-req before either tier:** verify `apt` still works on this EOL Buster (deliberately not run during the audit).

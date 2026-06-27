@@ -176,7 +176,7 @@ unchanged). The Roku reads `catalog.json` (rebuilt from per‑item sidecars by
 ## Trip + fuel entry (C2 / C3)
 
 Driver/navigator mobile forms, cloned from the guest‑upload pattern. Both write atomic JSON
-read‑models on the **Pi SD card** (never the failing HDD); `/api/state` folds them into the
+read‑models on the **Pi SD card** (never the media disk/SSD); `/api/state` folds them into the
 `trip` and `fuel` sections above.
 
 ```jsonc
@@ -203,7 +203,7 @@ read‑models on the **Pi SD card** (never the failing HDD); `/api/state` folds 
 - A freshly‑created trip appears in `GET /api/media?type=trips` **immediately** as a zero‑item
   collection (merged from the trip store), so the upload form's trip picker lists it before any
   reindex. `scripts/media-reindex.py` later reconciles the same store (SD wins over the legacy
-  per‑collection HDD `trips/<cid>/trip.json`).
+  per‑collection media-disk `trips/<cid>/trip.json`).
 
 ## Versioning policy
 Additive fields are non‑breaking (Roku ignores unknown keys). Renames/removals/semantic

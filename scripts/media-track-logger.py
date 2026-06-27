@@ -121,7 +121,7 @@ def main():
                     append_point(path, lat, lon, tpv.get("alt"), t_iso)
                     last = here
                 except OSError:
-                    pass  # HDD not mounted / write error — try again next tick
+                    pass  # media disk not mounted / write error — try again next tick
         time.sleep(INTERVAL_S)
 
 

@@ -1,6 +1,12 @@
-0.6.0
+0.6.1
 
 ## Changelog
+
+### 0.6.1 (2026-06-27)
+- **Media disk replaced: failing HDD → SSD.** Swapped the failing Seagate ST1000LM037 exFAT HDD at `/mnt/usb` for a **Crucial BX500 1 TB SSD** (ext4, label `media`, mounted **by UUID** with `nofail` so a missing disk can't hang the remote Pi's boot). Done live over the WireGuard tunnel; verified clean across a reboot (`findmnt` = SSD, all services up, `/api/health` ok, `get_throttled` back to `0x0`).
+- **Media not migrated — re-encode from source.** The `home/` library tree was recreated empty (`media-reindex.py` → catalog 0/0); the user's `movies/`+`tv/` were preserved on the SSD. Durable read-models (`catalog.json`, trips, fuel, waypoints, view-state, GPS tracks) untouched on the SD card. The map tile cache (`/mnt/usb/home/maptiles`) starts empty — re-seed with `map-preseed.py` before a trip.
+- **Power note:** running both disks on the Pi's USB bus during the swap caused a single ~4 s under-voltage dip; a single SSD boots clean at `0x0`. The 12 V→5 V feed is still the underlying fix (`subsystems/power/`).
+- **Docs + skill sweep:** retired every "failing exFAT HDD / bad-sector" reference across the repo (code comments, `configs/`, `docs/`, `subsystems/`, `mapoptimize.md`) to the new ext4 SSD; kept `subsystems/media/hdd-failure-2026-06-26.md` as a RESOLVED historical record; refreshed the `sallynet-pi-ops` skill (SSD facts + the layered-map render pipeline + `view-state.json` read-model).
 
 ### 0.6.0 (2026-06-27)
 - **Map interface — layered on-demand PNG + shared web control (built, TDD'd; 94 tests green).** Extends the P1–P5 ambient map per `mapoptimize.md`. All **additive** to the frozen `/api` contract (no `schemaVersion` bump). The PNG is generated on demand per `/api/map.png` (single-flight cached), tuned for highway/city driving — not streamed.

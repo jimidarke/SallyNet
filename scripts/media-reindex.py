@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """media-reindex.py — rebuild the catalog.json read-model from per-item sidecars.
 
-Sidecars (one JSON per item, on the HDD with the media) are the source of truth.
+Sidecars (one JSON per item, on the media disk with the media) are the source of truth.
 catalog.json is a derived cache that sally-api loads and slices to serve
 /api/media?type=trips, /api/collections/<id> and /api/photos. It lives on the Pi's
-local disk (not exFAT) and is rewritten atomically under an flock so a concurrent
+local disk (the crash-safe SD card) and is rewritten atomically under an flock so a concurrent
 worker + API never see a half-written file.
 
 Shape:
@@ -32,7 +32,7 @@ SIDECAR_DIR = os.environ.get("SIDECAR_DIR", "/mnt/usb/home/catalog/items")
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT", "/mnt/usb/home/library")
 CATALOG_JSON = os.environ.get("CATALOG_JSON", "/var/lib/sally/catalog.json")
 # Canonical trip store (SD card) written by sally-api's trip-entry form. Source of
-# truth for trip metadata; wins over the legacy per-collection HDD trip.json files.
+# truth for trip metadata; wins over the legacy per-collection media-disk trip.json files.
 TRIPS_JSON = os.environ.get("TRIPS_JSON", "/var/lib/sally/trips.json")
 # Past-trip geotagged photos -> map pins (read by sally-api's "photos" map layer).
 PHOTO_POI_JSON = os.environ.get("PHOTO_POI_JSON", "/var/lib/sally/photo-poi.json")
@@ -56,10 +56,10 @@ def load_sidecars():
 def load_trip_meta():
     """collectionId -> trip metadata (title, place, cover, dates).
 
-    Reconciles two sources: the legacy per-collection HDD trip.json files (kept for
+    Reconciles two sources: the legacy per-collection media-disk trip.json files (kept for
     backward-compat / hand edits) and the canonical SD trips.json the dashboard's
     trip-entry form writes. The SD store WINS per collection — it removes a read
-    dependency on the failing HDD and lets trip entry create a collection's metadata
+    dependency on the media disk and lets trip entry create a collection's metadata
     before any photo lands there.
     """
     meta = {}
@@ -76,7 +76,7 @@ def load_trip_meta():
             store = json.load(f)
         for cid, t in (store.get("trips") or {}).items():
             if t.get("id"):
-                meta[cid] = {**meta.get(cid, {}), **t}  # SD store overrides HDD
+                meta[cid] = {**meta.get(cid, {}), **t}  # SD store overrides media disk
     except (ValueError, OSError):
         pass
     return meta

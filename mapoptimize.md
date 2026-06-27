@@ -42,16 +42,16 @@ area over a flaky/slow LTE link** — so it's worth smoothing out.
 
 | Layer | Where | Lifetime | Notes |
 |---|---|---|---|
-| **Tile cache** (basemap PNGs) | `/mnt/usb/home/maptiles/{z}/{x}/{y}.png` — **HDD** | **Forever** — no TTL, no eviction. Survives reboot/restart. | One PNG per slippy tile, written on first fetch. Re-visiting = instant, zero network (the offline strategy). |
+| **Tile cache** (basemap PNGs) | `/mnt/usb/home/maptiles/{z}/{x}/{y}.png` — **SSD** | **Forever** — no TTL, no eviction. Survives reboot/restart. | One PNG per slippy tile, written on first fetch. Re-visiting = instant, zero network (the offline strategy). |
 | **Rendered-PNG cache** (composed frame) | process RAM (`mapgen._last`) | ~3 s moving / ~20 s parked; **gone on restart** | Single frame, keyed shape+content. The poll throttle. |
 | **POI / waypoints / route JSON** | `/var/lib/sally/*.json` — **SD** | Durable, crash-safe (atomic writes) | Lets POIs/waypoints/countdown keep working offline. |
 
 **Tile-cache specifics (the important one):**
-- **Best-effort R/W** — a read/write error is swallowed → an HDD bad sector just means that tile
-  doesn't cache (silently re-fetched next time), never crashes a render. (See `tiles._cache_read` /
+- **Best-effort R/W** — a read/write error is swallowed → a disk error or unmount just means that
+  tile doesn't cache (silently re-fetched next time), never crashes a render. (See `tiles._cache_read` /
   `tiles._cache_write`.)
-- **It's on the failing Seagate** (`subsystems/media/hdd-failure-2026-06-26.md`). "Persists forever"
-  really means "until that sector dies." The durable copies are the SD read-models, not the tiles.
+- **It's on the media SSD** (the Crucial BX500 at `/mnt/usb`, ext4). "Persists forever" holds as long
+  as the SSD stays mounted and healthy. The durable copies are the SD read-models, not the tiles.
 - **If `/mnt/usb` is unmounted**, caching silently disables → every render goes live → permanent
   slowness. A real failure mode worth detecting + surfacing (see followups).
 - **Unbounded growth** — no size cap / LRU. Fine at 500 GB for years; note it anyway.
@@ -93,8 +93,8 @@ badge** instead of a 30 s hang, and the provider is left alone to recover. The h
 `TILE_FETCH_WORKERS=8` (all env-overridable, matching the existing pattern).
 
 **Do NOT:** add per-tile retries (hammers harder — backoff is the opposite and correct); move the
-tile cache to the SD (wear-sensitive; tiles are bulky + disposable — HDD is the right call and
-best-effort writes already tolerate its faults).
+tile cache to the SD (wear-sensitive; tiles are bulky + disposable — the media SSD is the right call
+and best-effort writes already tolerate transient faults).
 
 **Testing:** the breaker + negative-cache decisions are pure, time-based logic (inject `now`) — TDD
 them exactly like `mapgen._reuse_cached` (`test_tiles.py`). Add an integration check: a `fetch` that
@@ -105,7 +105,7 @@ calling `fetch` for cooled-down tiles.
 
 ## Other followups / watch-items
 
-- **HDD-unmount detection.** If `/mnt/usb` isn't mounted, tile caching silently no-ops → every
+- **Media-disk unmount detection.** If `/mnt/usb` isn't mounted, tile caching silently no-ops → every
   render is live → chronic slowness. Detect (cache dir missing/!writable) and surface a one-time
   warn + a status hint, so it's diagnosable instead of mysterious.
 - **Cache size / hygiene.** Unbounded today (fine at 500 GB). If ever needed: an LRU prune or a

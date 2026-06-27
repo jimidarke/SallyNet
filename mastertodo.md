@@ -16,7 +16,7 @@ execute as a batch once the plan is settled.
       `/api/collections/<id>`, `/api/photos`, `/media` Range, `/api/qr.png`, upload) + Roku
       Media (rows-as-trips), `VodPlayer`, PhotoGallery, QrScreen. Deployed + verified.
 - [x] GPS breadcrumb logger + nightly idle-prio encode timer on the Pi (won't fight RetroPie).
-- Notes: HDD has a localized **bad sector** (monitor); staying on **Pi Buster** for now (N100 is the real upgrade later); catalog + tracks live on the Pi SD card, not the exFAT HDD.
+- Notes: media disk **replaced by a Crucial BX500 1TB SSD** (ext4) on 2026-06-27 — the failing exFAT HDD is gone; staying on **Pi Buster** for now (N100 is the real upgrade later); catalog + tracks live on the Pi SD card, independent of the media disk.
 
 ---
 
@@ -27,14 +27,14 @@ execute as a batch once the plan is settled.
 - **Media = one page, tab strip:** `Trips | Movies | TV Shows`. D-pad up to tabs, left/right to switch.
 - **Uploads always go to Trips** (the home pipeline). Movies/TV are curated from owned files.
 - **TV `.mkv` → re-encode from source later**, not remuxed on Sally. Indexer emits a worklist; originals are kept off-Sally; re-encoded `.mp4`s drop into a studio inbox. Movies (already mp4) work day one.
-- **Posters/metadata:** fetch online (LTE) + cache to HDD for offline; hand-editable overrides; frame-grab fallback.
+- **Posters/metadata:** fetch online (LTE) + cache to the SSD for offline; hand-editable overrides; frame-grab fallback.
 
 ---
 
 ## A. Media-as-everything redesign
 
 ### A1 — Backend: serve the studio library
-- [ ] Broaden the `/media/<path>` Range root from `home/library` to the **HDD top** (`/mnt/usb`) so `media/movies/…`, `media/tv/…`, and `home/library/…` all stream through the one handler. Keep the traversal sandbox (reject `..`, resolve under root).
+- [ ] Broaden the `/media/<path>` Range root from `home/library` to the **media-disk top** (`/mnt/usb`) so `media/movies/…`, `media/tv/…`, and `home/library/…` all stream through the one handler. Keep the traversal sandbox (reject `..`, resolve under root).
 - [ ] Re-verify Range (206) + traversal guard against the broadened root.
 - [ ] Config: add `STUDIO_ROOT` / adjust `MEDIA_ROOT` in `sallyconf.py` (env-overridable for N100).
 
@@ -81,7 +81,7 @@ execute as a batch once the plan is settled.
 4. **A4 posters** (online fetch + cache + overrides).
 
 ### Open questions for A
-- [~] **VERIFY photos pipeline** — confirmed mechanics (upload → `inbox/<batch>/` + `upload.json` → nightly 02:00 ingest → `library/<route>/photos/` → `/api/photos` + Media→Trips; not instant). **BLOCKED on storage:** the first real upload (`trip: unsorted`) failed at ingest because `library/unsorted/` is on the HDD's dead band — see HDD item below + `subsystems/media/hdd-failure-2026-06-26.md`. Pipeline failed safe (photo preserved in `home/failed/`). Re-verify the happy path once the disk is backed up + replaced/formatted. **Side note:** the upload form defaulted `trip` to `unsorted`, contradicting the "uploads always go to Trips" locked decision — fix the default so uploads land in `trips/` (also dodges the dead `unsorted/` dir).
+- [~] **VERIFY photos pipeline** — confirmed mechanics (upload → `inbox/<batch>/` + `upload.json` → nightly 02:00 ingest → `library/<route>/photos/` → `/api/photos` + Media→Trips; not instant). **Storage unblocked 2026-06-27** — the failing HDD that broke the first real ingest was replaced with the SSD (HDD item below). Re-verify the happy path with a real upload now. **Side note:** the upload form defaulted `trip` to `unsorted`, contradicting the "uploads always go to Trips" locked decision — fix the default so uploads land in `trips/`.
 - [?] Default tab (Trips? last-used?).
 - [?] Pending episodes: grey-disable (planned) vs. hide entirely.
 - [?] Kid-safe: just a flag/badge, or an actual "kids mode" filter/lock?
@@ -105,7 +105,7 @@ execute as a batch once the plan is settled.
 - [x] **P0** — shell (Splash/Home/Drive + `/api/state` poll).
 - [~] **P1** — Media: home trips + photos + upload done; **Movies/TV = Workstream A**.
 - [ ] **P2** — Sensors + Camp/Systems (Pi-hosted, gated on power): Mosquitto + ~150-line collector + SQLite; ESP32 nodes — **belly** (tanks: CD4051 + reused 1980s probes), **cabin** (env BME280/AHT20/DS18B20 + IMU MPU-9250 for leveling/heading), **house** (12V INA226/shunt). Offline **`/api/map.png`** render + **`/api/level.png`** bubble + compass. Camp + Systems screens. Cabin **fuel logger** (node-door → `/api/fuel-log`). **Node fleet contract + catalog: `subsystems/telemetry/esp-fleet.md` (tracked in C4).**
-- [ ] **P3** — N100 migration + Cameras: move services + HDD to the N100 (modern OS, current ffmpeg → HEVC, drops Buster workarounds); Pi → pure RetroPie; go2rtc USB capture → MJPEG rear-view + HLS dashcam; Cameras screen + Drive rear-view PIP (auto on `drive.reverse`).
+- [ ] **P3** — N100 migration + Cameras: move services + the media SSD to the N100 (modern OS, current ffmpeg → HEVC, drops Buster workarounds); Pi → pure RetroPie; go2rtc USB capture → MJPEG rear-view + HLS dashcam; Cameras screen + Drive rear-view PIP (auto on `drive.reverse`).
 - [ ] **P4** — Audio: RF headphones (movie lip-sync) + BETS-1 FM (music); audio-status strip.
 - [x] **P5** — QR photos *(landed early as part of P1 home media)*.
 - [ ] **P6** — Router WiFi-as-WAN: travelmate + mwan3 over UCI/SSH; RT5370 USB WiFi; Network panel.
@@ -115,7 +115,7 @@ execute as a batch once the plan is settled.
   `/api/launch?app=netflix` → Pi (external controller) ECP `/launch/<id>` to the Roku
   (id from `request.remote_addr`). Launch-only first pass; deep-link `contentId` deferred.
   Plan: `subsystems/media/netflix-youtube-launch-tiles-plan.md`.
-- [~] **HDD FAILING (2026-06-26)** — the bad band now fails **writes** too; `home/library/{unsorted,memories,tracks}` + `home/logs` unreadable; first real upload-ingest failed there. SMART unreadable through the Seagate USB bridge (needs shucking). **Back up the 312 GB `media/` now, then full-format-test or replace.** Full diagnosis: `subsystems/media/hdd-failure-2026-06-26.md`.
+- [x] **HDD replaced with SSD (2026-06-27)** — the failing Seagate exFAT HDD was swapped for a **Crucial BX500 1TB SSD** (ext4, `/mnt/usb` by UUID, `nofail`). Media **not migrated — re-encode from source** (catalog reset 0/0); the user's movies/TV were preserved; SD read-models untouched; Pi now boots at `get_throttled=0x0`. History: `subsystems/media/hdd-failure-2026-06-26.md`.
 - [ ] **Channel tests** — `package.json` test:unit/test:smoke/contract scripts are stubs (no files yet); build them out.
 
 ---
@@ -125,7 +125,7 @@ execute as a batch once the plan is settled.
 ### C0 — Quick wins (small; do alongside A)
 - [ ] **Speed deadband** — round speeds below ~1 km/h to 0 so GPS jitter (e.g. 0.3 km/h while parked) never reads as moving or flips mode. Apply in `sally-api` gps normalize (`gpsd_client`/`_derive_mode`) and/or Roku display.
 - [ ] **Time format everywhere** — `h:mm AM/PM`, localized to the **GPS-derived timezone**, with a zone abbreviation badge (**MT / PT / CT …**) that updates as we cross zones. Needs offline tz-from-GPS (coarse longitude/boundary lookup, no internet). Replace `snClockHM`/`snClockHMS` + any timestamp rendering.
-- [ ] **Weather tile (Home top-right)** — fill the empty top-right of the Home hub with **local weather based on GPS** (fetch over LTE, cache to HDD for dead zones). Small current-conditions card.
+- [ ] **Weather tile (Home top-right)** — fill the empty top-right of the Home hub with **local weather based on GPS** (fetch over LTE, cache to the SSD for dead zones). Small current-conditions card.
 
 ### C1 — Home page push-to-QR
 - [ ] Push a command from the main screen / external trigger to **show the upload QR on demand** (ECP `/input` deep-link or an Info-button surface), so guests can be handed the QR without navigating into Photos.

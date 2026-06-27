@@ -41,7 +41,7 @@ How Sally's boxes are wired together as of 2026-05-17. Update when topology chan
 │  future Sally    │   │  (after v0.2.0: pure    │      - Snapcast server
 │  channel via     │   │   RetroPie appliance)   │    │ - MPD + librespot       │
 │  sideload)       │   │                         │      - PipeWire audio graph
-└────────┬─────────┘   │  (HDD migrates to       │    │ - gpsd + Traccar        │
+└────────┬─────────┘   │  (SSD migrates to       │    │ - gpsd + Traccar        │
          │ HDMI        │   mini-PC)              │      - MQTT broker
          │             └──────────┬──────────────┘    │ - Roku media HTTP       │
          │                        │                     - QX-18 PA mic capture

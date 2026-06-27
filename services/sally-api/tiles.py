@@ -6,7 +6,7 @@ stitches the viewport's tiles onto one canvas, gap-filling whatever it can't fet
 cache in an LTE dead zone degrades gracefully instead of failing.
 
 Tiles come from a raster provider (cfg.TILE_URL_TEMPLATE, default Thunderforest Outdoors) and are
-cached forever on the HDD. The OSM public tile server is deliberately NOT used — its usage policy
+cached forever on the media disk. The OSM public tile server is deliberately NOT used — its usage policy
 forbids the caching/pre-seed this design relies on. NB: Thunderforest's free Hobby tier forbids it
 too (Small Business+ / custom plan required); the cache-forever design assumes that arrangement,
 and the negative-cache + circuit breaker below keep request rates polite in the meantime.
@@ -148,7 +148,7 @@ def _parse_retry_after(value):
         return 0
 
 
-# --- tile cache + fetch (best-effort I/O; HDD has a failing band) ------------------------
+# --- tile cache + fetch (best-effort I/O; a disk hiccup degrades to a cache miss) --------
 
 def _tile_cache_path(z, x, y):
     return os.path.join(cfg.TILE_CACHE_DIR, str(z), str(x), "%d.png" % y)
@@ -159,8 +159,8 @@ def _tile_url(z, x, y):
 
 
 def _cache_write(path, data):
-    """Best-effort write-back. A failed write (full / flaky HDD) is swallowed — we just
-    won't have the tile cached and will re-fetch it next time."""
+    """Best-effort write-back. A failed write (full disk / unmount / transient I/O) is
+    swallowed — we just won't have the tile cached and will re-fetch it next time."""
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp = path + ".tmp"
@@ -172,7 +172,7 @@ def _cache_write(path, data):
 
 
 def _cache_read(z, x, y):
-    """Bytes from the disk cache only (no network). None on miss or HDD read error."""
+    """Bytes from the disk cache only (no network). None on miss or a disk read error."""
     try:
         with open(_tile_cache_path(z, x, y), "rb") as f:
             return f.read()
@@ -199,7 +199,7 @@ def _http_get(z, x, y, now):
 def fetch_tile(z, x, y, _net=None, _now=None):
     """PNG bytes for tile (z,x,y): disk cache first; then — unless this tile is cooled or the
     global breaker is open — a live fetch, written back to the cache. Returns None on any
-    miss+failure. Every disk op is wrapped so an HDD I/O error degrades to a live fetch / a gap
+    miss+failure. Every disk op is wrapped so a disk I/O error degrades to a live fetch / a gap
     rather than crashing the render. `_net`/`_now` are injectable for tests (default: real HTTP
     + wall clock)."""
     data = _cache_read(z, x, y)

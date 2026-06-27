@@ -40,10 +40,10 @@ CATALOG_JSON = os.environ.get("CATALOG_JSON", "/var/lib/sally/catalog.json")
 INBOX_DIR = os.environ.get("INBOX_DIR", "/mnt/usb/home/inbox")
 
 # --- trip + fuel logs (C2 / C3) ----------------------------------------------
-# Canonical read-models on the Pi's LOCAL disk (SD), NOT the exFAT HDD — the HDD has
-# a failing band, and these need crash-safe atomic writes. trips.json is the source of
-# truth for the dashboard's active trip AND the media pipeline's collection metadata
-# (media-reindex.py prefers it over the HDD trips/<cid>/trip.json). route.json is the
+# Canonical read-models on the Pi's LOCAL disk (SD), NOT the media disk — these need
+# crash-safe atomic writes, and small wear-sensitive state belongs on the SD. trips.json
+# is the source of truth for the dashboard's active trip AND the media pipeline's collection
+# metadata (media-reindex.py prefers it over the media disk's trips/<cid>/trip.json). route.json is the
 # OSRM ETA cache written by scripts/trip-eta-refresh.py. fuel-log.json is the structured
 # fill-up history; docs/fuel-log.md is the human-readable mirror.
 TRIPS_JSON = os.environ.get("TRIPS_JSON", "/var/lib/sally/trips.json")
@@ -83,9 +83,9 @@ TILE_URL_TEMPLATE = os.environ.get(
     "TILE_URL_TEMPLATE",
     "https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey={key}")
 TILE_API_KEY = os.environ.get("TILE_API_KEY", "")
-# Tile cache lives on the HDD (bulky + disposable; the wrong profile for the wear-sensitive
-# SD). The HDD has a failing band — every tile read/write is best-effort, so an I/O error
-# just becomes a cache miss -> live re-fetch and never crashes a render.
+# Tile cache lives on the media disk (bulky + disposable; the wrong profile for the
+# wear-sensitive SD). Every tile read/write is best-effort, so a disk I/O error (unmount,
+# full disk, transient fault) just becomes a cache miss -> live re-fetch and never crashes a render.
 TILE_CACHE_DIR = os.environ.get("TILE_CACHE_DIR", "/mnt/usb/home/maptiles")
 TILE_ATTRIBUTION = os.environ.get(
     "TILE_ATTRIBUTION", "(C) OpenStreetMap contributors  (C) Thunderforest")

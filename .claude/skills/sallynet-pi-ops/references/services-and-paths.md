@@ -30,17 +30,18 @@ RetroPie. `media-encode` runs at `Nice=15` / idle IO+CPU scheduling for the same
   media/            # pipeline scripts + lib/ + sally-media.conf
   net/              # lte-monitor.py, wg-watchdog.sh
 
-/var/lib/sally/     # SD CARD — atomic, crash-safe read-models (NOT the failing HDD)
+/var/lib/sally/     # SD CARD — atomic, crash-safe read-models (NOT the media SSD)
   catalog.json          # home-media read-model (rebuilt by media-reindex.py)
   trips.json            # active trip + waypoints (source of truth)
   route.json            # OSRM ETA cache (trip-eta-refresh.py)
   waypoint-route.json   # OSRM ETA to next waypoint (waypoint-eta-refresh.py)
   waypoints.json        # trip pins (phone-edited at /waypoints)
   poi-cache.json        # Overpass snapshot (poi-refresh.py)
+  view-state.json       # shared map layer visibility + base-source (POST /api/view)
   fuel-log.json         # structured fill-up history
   tracks/YYYY-MM-DD.gpx # daily breadcrumbs (media-track-logger.py)
 
-/mnt/usb/home/      # HDD (exFAT, FAILING) — bulky media library tree
+/mnt/usb/home/      # media SSD (Crucial BX500 1TB, ext4, UUID-mounted) — bulky media library tree
   inbox/ work/ library/{trips,drone,memories,unsorted}/
   originals/ catalog/items/ maptiles/ failed/ logs/
 
@@ -52,13 +53,14 @@ RetroPie. `media-encode` runs at `Nice=15` / idle IO+CPU scheduling for the same
 /dev/serial0 -> ttyAMA0        # PL011 UART, freed for the router serial link
 ```
 
-## Why SD vs HDD split
+## Why SD vs media-disk split
 
-The read-models need crash-safe atomic writes and the HDD has a failing band — so the
-small, wear-tolerant, frequently-rewritten state lives on the SD card (`/var/lib/sally`)
-and only the bulky, disposable media + tile cache live on the HDD (`/mnt/usb/home`). A
-tile read/write that hits the bad band degrades to a cache miss, never a crash. Keep new
-durable state on the SD side.
+The read-models need crash-safe atomic writes — so the small, wear-tolerant,
+frequently-rewritten state lives on the SD card (`/var/lib/sally`) and only the bulky,
+disposable media + tile cache live on the media SSD (`/mnt/usb/home`). Every tile/library
+read+write is still best-effort — an unmount or I/O error degrades to a cache miss, never a
+crash. The SSD `home/` tree is re-encodable from source (not backed up); the SD read-models
+are the durable copy, so keep new durable state on the SD side.
 
 ## Pi → N100 migration (Phase 3)
 
