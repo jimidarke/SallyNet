@@ -25,6 +25,7 @@ sub init()
     m.lastMode = ""
     m.modeStable = 0
     m.lastState = invalid
+    m.manualRoute = false
 
     m.poll.observeField("snapshot", "onPollState")
     m.stateTimer.observeField("fire", "onStateTick")
@@ -97,7 +98,7 @@ sub maybeLeaveSplash()
     if not m.splashElapsed then return
     target = routeForMode(modeOf(m.lastState))
     if target = "" then target = "home"
-    go(target)
+    goAuto(target)
 end sub
 
 function modeOf(s as object) as string
@@ -118,10 +119,12 @@ sub applyMode(s as object)
     if not isPassive(m.route) then return
     if m.modeStable < 2 then return
     target = routeForMode(mode)
-    if target <> "" and target <> m.route then
-        slEvent("mode_switch", { mode: mode, to: target })
-        go(target)
-    end if
+    if target = "" or target = m.route then return
+    ' Promoting into an active screen (drive/camp) is always allowed, but auto-routing
+    ' must never demote a screen the user picked themselves back to the generic hub.
+    if target = "home" and m.manualRoute then return
+    slEvent("mode_switch", { mode: mode, to: target })
+    goAuto(target)
 end sub
 
 function routeForMode(mode as string) as string
@@ -137,6 +140,18 @@ function isPassive(route as string) as boolean
 end function
 
 sub go(route as string)
+    m.manualRoute = true
+    applyRoute(route)
+end sub
+
+' Mode-triggered switch (applyMode) — kept distinct from go() so applyMode can tell
+' "user picked this screen" from "auto-routing put me here" via m.manualRoute.
+sub goAuto(route as string)
+    m.manualRoute = false
+    applyRoute(route)
+end sub
+
+sub applyRoute(route as string)
     ' Free the single H.264 decoder when leaving the player (decoder discipline).
     if m.route = "vod" and route <> "vod" then m.vod.active = false
 
