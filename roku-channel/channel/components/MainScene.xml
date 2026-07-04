@@ -33,6 +33,7 @@
 
         <StatePollTask id="poll" />
         <MediaListTask id="mediaList" />
+        <StudioListTask id="studioList" />
         <Timer id="stateTimer" repeat="true" duration="5" />
         <Timer id="splashTimer" repeat="false" duration="2" />
         <Timer id="toastTimer" repeat="false" duration="2.5" />

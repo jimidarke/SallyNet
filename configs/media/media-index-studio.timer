@@ -1,0 +1,11 @@
+[Unit]
+Description=SallyNet studio library index — nightly Movies/TV scan
+
+[Timer]
+# 02:30 local, offset from media-encode.timer's 02:00 so the two never overlap.
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

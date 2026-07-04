@@ -23,6 +23,7 @@ sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/media-track-logger.py" "$REPO/scripts/media-reindex.py" \
   "$REPO/scripts/trip-eta-refresh.py" "$REPO/scripts/waypoint-eta-refresh.py" \
   "$REPO/scripts/poi-refresh.py" "$REPO/scripts/map-preseed.py" "$REPO/scripts/nav-tick.py" \
+  "$REPO/scripts/media-index-studio.py" \
   "$PI_USER@$PI_HOST:/opt/sally/media/"
 sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/lib/" "$PI_USER@$PI_HOST:/opt/sally/media/lib/"
@@ -35,7 +36,8 @@ sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
   "[ -f /opt/sally/media/sally-media.conf ] || mv /tmp/sally-media.conf /opt/sally/media/sally-media.conf; rm -f /tmp/sally-media.conf"
 
 header "installing systemd units"
-for u in media-track-logger.service media-encode.service media-encode.timer; do
+for u in media-track-logger.service media-encode.service media-encode.timer \
+         media-index-studio.service media-index-studio.timer; do
   sshpass -e scp "${SSH_OPTS[@]}" "$REPO/configs/media/$u" "$PI_USER@$PI_HOST:/tmp/$u"
   sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" "sudo mv /tmp/$u /etc/systemd/system/$u"
 done
@@ -51,10 +53,10 @@ done
 sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
   "sudo systemctl daemon-reload \
    && sudo systemctl enable --now media-track-logger.service \
-   && sudo systemctl enable --now media-encode.timer \
+   && sudo systemctl enable --now media-encode.timer media-index-studio.timer \
    && sudo systemctl enable --now trip-eta.timer waypoint-eta.timer poi-refresh.timer \
    && sudo systemctl enable --now nav-tick.service \
-   && sleep 1 && systemctl is-active media-track-logger.service nav-tick.service && systemctl list-timers media-encode.timer trip-eta.timer waypoint-eta.timer poi-refresh.timer --no-pager | head -6"
+   && sleep 1 && systemctl is-active media-track-logger.service nav-tick.service && systemctl list-timers media-encode.timer media-index-studio.timer trip-eta.timer waypoint-eta.timer poi-refresh.timer --no-pager | head -7"
 
 header "ensuring media tree exists"
 sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \

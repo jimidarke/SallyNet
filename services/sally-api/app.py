@@ -24,6 +24,7 @@ from werkzeug.utils import secure_filename
 
 import sallyconf as cfg
 import store
+import studio_index
 import trail
 import waypoints as waypoints_mod
 from gpsd_client import read_fix
@@ -221,6 +222,7 @@ document.getElementById('f').onsubmit=function(e){e.preventDefault();
 
 
 # Cached readers for the trip store + OSRM route cache (mtime-checked per request).
+_movies = store.CachedJson(cfg.MOVIES_JSON, {"collections": [], "items": {}})
 _trips = store.CachedJson(cfg.TRIPS_JSON, {"activeTripId": None, "trips": {}})
 _route = store.CachedJson(cfg.ROUTE_JSON, {})
 _fuel = store.CachedJson(cfg.FUEL_LOG_JSON, {"entries": []})
@@ -458,8 +460,14 @@ def _trip_stub(t):
 
 @app.route("/api/media")
 def api_media():
-    """type=trips -> home collections. movies|tv|kids (studio library) not in this build."""
+    """type=trips -> home collections. type=movies -> studio library (Workstream A).
+    type=tv|kids -> reserved, still empty (tv lands in a later phase; kids is a per-item
+    kidSafe flag, not its own catalog)."""
     t = request.args.get("type", "trips")
+    if t == "movies":
+        m = _movies.get()
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "type": t,
+                         "collections": m.get("collections", [])})
     if t != "trips":
         return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "type": t, "collections": []})
     cat = _load_catalog()
@@ -475,6 +483,14 @@ def api_media():
 
 @app.route("/api/collections/<cid>")
 def api_collection(cid):
+    movies_cat = _movies.get()
+    movie_items = movies_cat.get("items", {}).get(cid)
+    if movie_items is not None:
+        meta = next((c for c in movies_cat.get("collections", []) if c.get("id") == cid), {})
+        return jsonify(_prune({
+            "schemaVersion": cfg.SCHEMA_VERSION, "id": cid, "kind": meta.get("kind"),
+            "title": meta.get("title"), "items": movie_items,
+        }))
     cat = _load_catalog()
     items = cat.get("items", {}).get(cid)
     if items is None:
@@ -507,9 +523,16 @@ def api_photos():
     return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "photos": photos})
 
 
+_STUDIO_DIRS = {"movies", "tv"}
+
+
 def _safe_media_path(relpath):
-    """Resolve relpath under MEDIA_ROOT, rejecting traversal."""
-    root = os.path.realpath(cfg.MEDIA_ROOT)
+    """Resolve relpath under MEDIA_ROOT (trips/drone/unsorted, unchanged) or STUDIO_ROOT
+    (movies/tv), rejecting traversal. Two roots, not one broadened root, specifically so
+    broadening studio coverage can never shift where an existing Trips URL resolves."""
+    top = relpath.split("/", 1)[0]
+    base = cfg.STUDIO_ROOT if top in _STUDIO_DIRS else cfg.MEDIA_ROOT
+    root = os.path.realpath(base)
     full = os.path.realpath(os.path.join(root, relpath))
     if full != root and not full.startswith(root + os.sep):
         abort(403)

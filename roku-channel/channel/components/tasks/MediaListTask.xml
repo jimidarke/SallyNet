@@ -14,5 +14,6 @@
     <script type="text/brightscript" uri="MediaListTask.brs" />
     <script type="text/brightscript" uri="pkg:/source/Config.brs" />
     <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Http.brs" />
     <script type="text/brightscript" uri="pkg:/source/Media.brs" />
 </component>

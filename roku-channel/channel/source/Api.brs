@@ -13,6 +13,9 @@ function snMediaUrl(kind as string) as string : return snApiBase() + "/api/media
 
 ' --- home media (P1/P5) --------------------------------------------------
 function snMediaTripsUrl() as string : return snMediaUrl("trips") : end function
+
+' --- studio library: Movies (Workstream A, Phase 1) -----------------------
+function snMediaMoviesUrl() as string : return snMediaUrl("movies") : end function
 function snCollectionUrl(id as string) as string : return snApiBase() + "/api/collections/" + id : end function
 function snPhotosUrl() as string : return snApiBase() + "/api/photos" : end function
 function snQrUrl() as string : return snApiBase() + "/api/qr.png" : end function

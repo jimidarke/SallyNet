@@ -13,6 +13,10 @@
     <children>
         <Poster id="poster" width="300" height="169" loadDisplayMode="scaleToZoom"
                 uri="pkg:/images/transparent.png" />
+        <!-- kidSafe badge: only shown once overrides/TMDB data sets itemContent.kidSafe -->
+        <Rectangle id="kidBadgeBg" translation="[6, 6]" width="70" height="26" color="0x6B9080FF" visible="false" />
+        <Label id="kidBadgeLabel" translation="[12, 10]" width="60" height="20"
+               color="0xFFF8E1FF" font="font:SmallBoldSystemFont" text="KIDS" visible="false" />
         <Rectangle id="stripeRed" translation="[0, 169]" width="300" height="4" color="0xC8462EFF" visible="false" />
         <Rectangle id="stripeOrange" translation="[0, 173]" width="300" height="4" color="0xE8702EFF" visible="false" />
         <Label id="cap" translation="[4, 182]" width="292" height="40"

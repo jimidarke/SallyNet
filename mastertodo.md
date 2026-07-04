@@ -33,60 +33,59 @@ execute as a batch once the plan is settled.
 
 ## A. Media-as-everything redesign
 
-### A1 — Backend: serve the studio library
-- [ ] Broaden the `/media/<path>` Range root from `home/library` to the **media-disk top** (`/mnt/usb`) so `media/movies/…`, `media/tv/…`, and `home/library/…` all stream through the one handler. Keep the traversal sandbox (reject `..`, resolve under root).
-- [ ] Re-verify Range (206) + traversal guard against the broadened root.
-- [ ] Config: add `STUDIO_ROOT` / adjust `MEDIA_ROOT` in `sallyconf.py` (env-overridable for N100).
+### A1 — Backend: serve the studio library — DONE (2026-07-04)
+- [x] Broadened via a **second root**, not by repointing `MEDIA_ROOT`: `STUDIO_ROOT` (`/mnt/usb`) handles `movies/…` and `tv/…`; `MEDIA_ROOT` (`home/library`) is untouched — repointing one root would have broken every existing Trips URL (they're stored relative to `home/library`). Confirmed live paths have **no `media/` prefix** — it's `/mnt/usb/movies/…` and `/mnt/usb/tv/…` directly (every "media/movies", "media/tv" mention below was wrong, now fixed).
+- [x] Re-verified: Range (206) + traversal guard (403/404) both tested against the new dispatch, movies + trips.
+- [x] `STUDIO_ROOT` + `MOVIES_JSON` added to `sallyconf.py` + `sally-media.conf` (env-overridable, same idiom as everything else there).
 
-### A2 — Backend: studio indexer
-- [ ] New `scripts/media-index-studio.py` — scan `media/movies` + `media/tv`:
-  - Movies: one item per `.mp4` (title from filename; `container=mp4`, playable).
-  - TV: dir = show; parse `SxxExx` (and loose patterns) → show / season / episode; record source container (`mkv` ⇒ pending re-encode).
-- [ ] Emit `movies.json` / `tv.json` read-models (on the Pi SD, like `catalog.json`).
-- [ ] Emit the **re-encode worklist** (see A6).
-- [ ] Merge a hand-editable **overrides** file (`configs/media/studio-overrides.json`): title, year, hidden, kidSafe, posterOverride, per file/show.
+### A2 — Backend: studio indexer — movies DONE (2026-07-04), TV not started
+- [x] New `scripts/media-index-studio.py` + `services/sally-api/studio_index.py` — scans `movies/<Title (Year)>/…`:
+  - [x] Movies: one item per folder with a real video file (title/year from folder name; folders with no file yet are silently skipped — the library is mid-transfer, ~24 of 178 folders populated so far).
+  - [ ] TV: dir = show; parse `SxxExx` (and loose patterns) → show / season / episode. **Not started.**
+- [x] `movies.json` emitted (Pi SD, like `catalog.json`); `tv.json` not yet.
+- [ ] Re-encode worklist (A6) — not started (moot until real non-mp4 TV sources exist; almost all current folders are empty placeholders, not un-encoded originals).
+- [ ] Overrides file (`configs/media/studio-overrides.json`) — not built yet. **Decided:** git-tracked + deploy-installed "only if absent" (same precedent as `sally-media.conf`), not media-disk-resident like `trip.json`.
 
-### A3 — Backend: API endpoints (additive to the frozen v1 contract)
-- [ ] `GET /api/media?type=movies` → `{items:[{id,title,url,poster,year,kidSafe,...}]}`.
-- [ ] `GET /api/media?type=tv` → `{collections:[{id=show,title,poster,seasons,episodeCount,...}]}`.
-- [ ] `GET /api/collections/<show>` → episodes grouped by season (reuse the existing shape; add `season`/`episode`/`pending`).
-- [ ] Document all of the above in `subsystems/media/api-contract.md` (additive).
+### A3 — Backend: API endpoints — movies DONE (2026-07-04), TV not started
+- [x] `GET /api/media?type=movies` → `{collections:[{id,kind,title,itemCount,detailUrl}]}` (categories, not flat items — see A5 below for why).
+- [ ] `GET /api/media?type=tv` — still reserved/empty.
+- [x] `GET /api/collections/<id>` extended to also resolve movie category ids (tries movies, then falls through to the trips catalog/store, same layering as trip stubs).
+- [x] Documented in `subsystems/media/api-contract.md`.
 
-### A4 — Backend: poster/metadata fetch (online → cached)
-- [ ] New `scripts/media-fetch-art.py` — when LTE is up, look up posters + title/year (TMDB), cache art to `/mnt/usb/media/.art/`; write matches into the catalogs.
-- [ ] `[?]` TMDB API key — where stored (gitignored `.env`?) and rate/locale settings.
+### A4 — Backend: poster/metadata fetch (online → cached) — not started
+- [ ] `scripts/media-fetch-art.py` (TMDB). **Resolved:** creds already provisioned in gitignored `.env.tmdb` (`TMDB_API_KEY` + `TMDB_API_READ_ACCESS_TOKEN`); v3 `api_key` query-param auth (simpler than v4 bearer); art cache dir `STUDIO_ROOT/.art` (no `media/` prefix).
 - [ ] Frame-grab fallback (ffmpeg) when offline / unmatched.
-- [ ] Opportunistic schedule (systemd timer when online?) vs. manual run — decide.
+- [ ] Opportunistic schedule vs. manual run — decide.
 
-### A5 — Roku: UI restructure
-- [ ] Rework `MediaScreen` into a **category tab strip** (Trips / Movies / TV Shows); remember last tab; D-pad up → tabs.
-- [ ] **Trips** pane = existing rows-as-trips (unchanged).
-- [ ] **Movies** pane = `MoviesGrid` (MarkupGrid of posters) → `VodPlayer`. (Optional later: rows by Kids/Family/All.)
-- [ ] **TV Shows** pane = shows grid → `Episodes` screen (seasons + episodes) → `VodPlayer`.
-  - [ ] Per-episode resume bookmark (registry, keyed on contentid — `VodPlayer` already does this).
-  - [ ] **Autoplay next episode** within a show (cancellable countdown).
-  - [ ] **Pending greyout** for not-yet-re-encoded `.mkv` episodes (visible but not selectable).
-- [ ] New `MediaListTask` fetches (or a sibling task) for `type=movies` / `type=tv`; registry cache for cold-start.
-- [ ] Confirm SallyNet stays the boot/default channel; built-in player never invoked.
+### A5 — Roku: UI restructure — movies + tab strip DONE (2026-07-04), TV not started
+- [x] `MediaScreen` reworked into a tab strip (Trips / Movies / TV Shows); D-pad Up focuses the tab row (real SceneGraph focus moves to an inert `tabRow` Group so the active RowList genuinely releases input), Left/Right switches tabs, Down/OK returns to the pane. **Default tab is always Trips** (resolved — not "remember last").
+- [x] **Trips** pane = existing rows-as-trips (unchanged, regression-verified live).
+- [x] **Movies** pane = **reuses the same RowList + MediaCard mechanism as Trips** (curated rows = categories), not a MarkupGrid/`MoviesGrid` — resolved as **curated rows**, not a flat grid. Phase 1 ships one row ("All Movies"); more rows (Kids & Family, genre) can be added later purely server-side, zero Roku changes needed.
+- [ ] **TV Shows** pane = shows grid → `Episodes` screen — not started (placeholder pane in place).
+  - [ ] Per-episode resume bookmark — `VodPlayer` already supports this generically, will fall out "for free" once Episodes exists.
+  - [ ] **Autoplay next episode** — real new `VodPlayer` logic needed, not free reuse (unlike Movies).
+  - Pending-episode display: **resolved as hide entirely** (not grey-disable) — simpler indexer, but TV will look sparse until real files land.
+- [x] New `StudioListTask` (sibling of `MediaListTask`, shares extracted `source/Http.brs`) for `type=movies`; registry cold-start cache **not** added (matches the existing gap — `SN_REG_MEDIA_CATALOG`/`PHOTO_CATALOG` consts have been dead/unused since Trips shipped too).
+- [x] Kid-safe: **resolved as badge/flag only**, no lock/PIN mode. MediaCard has a dormant badge (shows once `kidSafe` data exists, Phase 4). This makes the frozen contract's reserved `type=kids` value unnecessary — struck from `api-contract.md`, `kidSafe` is just an item flag now.
 
-### A6 — Re-encode worklist (the bridge to your owned TV)
-- [ ] Indexer generates `docs/studio-reencode-worklist.md` (or `.json`): every non-mp4 file, by show/season, with counts — the list to re-encode **from the high-quality originals (kept off-Sally)**.
-- [ ] Define a **studio inbox** (e.g. `/mnt/usb/media/_inbox/`) where re-encoded `.mp4`s land → indexer picks them up → episode flips from "pending" to playable.
-- [ ] Re-encode runs through the **existing gold-standard pipeline** (on a beefier box / the N100), not on the Pi.
+### A6 — Re-encode worklist (the bridge to your owned TV) — not started
+- [ ] Indexer generates `docs/studio-reencode-worklist.md`: every non-mp4 file, by show/season, with counts — the list to re-encode **from the high-quality originals (kept off-Sally)**. One encode profile for everything (movies/trips/TV) — the existing gold-standard `media-encode-video.sh`, unchanged, no per-source quality tiers.
+- [ ] Studio inbox (e.g. `/mnt/usb/_inbox/` — no `media/` prefix) where re-encoded `.mp4`s land.
+- [ ] Runs through the existing gold-standard pipeline (on a beefier box / the N100), not on the Pi.
 
 ### Build order for A
-1. **A1 + A2(movies) + A3(movies) + A5(Movies pane)** — Movies end-to-end, usable immediately (zero re-encode).
-2. **A5 tab strip** restructure (Trips / Movies / TV Shows).
-3. **A2(tv) + A3(tv) + A5(TV drill-in)** + **A6 worklist** — TV structure live; episodes fill in as re-encoded.
-4. **A4 posters** (online fetch + cache + overrides).
+1. ~~A1 + A2(movies) + A3(movies) + A5(Movies pane)~~ **DONE 2026-07-04.**
+2. ~~A5 tab strip restructure~~ **DONE 2026-07-04.**
+3. A2(tv) + A3(tv) + A5(TV drill-in) + A6 worklist — **next up.**
+4. A4 posters (online fetch + cache + overrides).
 
-### Open questions for A
+### Open questions for A — all resolved 2026-07-04
+- [x] Default tab: **always Trips.**
+- [x] Pending episodes: **hide entirely** (not grey-disable).
+- [x] Kid-safe: **flag/badge only** (not a lock/mode) — see A5.
+- [x] Movies: **curated rows** (categories), not a flat grid — see A5.
+- [x] Curation overrides: git-tracked, deploy-installed (see A2). TMDB key: already in `.env.tmdb` (see A4). Art dir: `STUDIO_ROOT/.art`.
 - [~] **VERIFY photos pipeline** — confirmed mechanics (upload → `inbox/<batch>/` + `upload.json` → nightly 02:00 ingest → `library/<route>/photos/` → `/api/photos` + Media→Trips; not instant). **Storage unblocked 2026-06-27** — the failing HDD that broke the first real ingest was replaced with the SSD (HDD item below). Re-verify the happy path with a real upload now. **Side note:** the upload form defaulted `trip` to `unsorted`, contradicting the "uploads always go to Trips" locked decision — fix the default so uploads land in `trips/`.
-- [?] Default tab (Trips? last-used?).
-- [?] Pending episodes: grey-disable (planned) vs. hide entirely.
-- [?] Kid-safe: just a flag/badge, or an actual "kids mode" filter/lock?
-- [?] Movies: flat poster grid vs. curated rows (genre/kids/all).
-- [?] Where curation overrides + TMDB key live; art dir path.
 
 ---
 

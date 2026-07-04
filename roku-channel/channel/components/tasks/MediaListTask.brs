@@ -6,16 +6,7 @@ sub init()
     m.top.functionName = "runFetch"
 end sub
 
-function httpGetJson(url as string) as object
-    t = createObject("roUrlTransfer")
-    t.setUrl(url)
-    t.setRequest("GET")
-    t.setMessagePort(createObject("roMessagePort"))
-    t.enableEncodings(true)
-    body = t.getToString()
-    if body = invalid or body = "" then return invalid
-    return ParseJson(body)
-end function
+' httpGetJson() lives in pkg:/source/Http.brs (shared with StudioListTask).
 
 sub runFetch()
     root = createObject("roSGNode", "ContentNode")

@@ -11,6 +11,7 @@ sub init()
     m.photos = m.top.findNode("photos")
     m.qr = m.top.findNode("qr")
     m.list = m.top.findNode("mediaList")
+    m.studioList = m.top.findNode("studioList")
     m.toast = m.top.findNode("toast")
     m.toastBg = m.top.findNode("toastBg")
     m.poll = m.top.findNode("poll")
@@ -42,6 +43,8 @@ sub init()
     m.list.observeField("videoCatalog", "onVideoCatalog")
     m.list.observeField("photoCatalog", "onPhotoCatalog")
     m.list.control = "RUN"
+    m.studioList.observeField("movieCatalog", "onMovieCatalog")
+    m.studioList.control = "RUN"
 
     ' Fast-paint from cached state.
     cached = readCachedState()
@@ -213,6 +216,7 @@ sub onHomeSelect()
         go("map")
     else if r = "media" then
         m.list.control = "RUN"
+        m.studioList.control = "RUN"
         go("media")
     else if r = "photos" then
         m.list.control = "RUN"
@@ -242,6 +246,10 @@ end sub
 
 sub onVideoCatalog()
     m.media.videoCatalog = m.list.videoCatalog
+end sub
+
+sub onMovieCatalog()
+    m.media.movieCatalog = m.studioList.movieCatalog
 end sub
 
 sub onPhotoCatalog()

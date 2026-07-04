@@ -3,6 +3,8 @@ sub init()
     m.cap = m.top.findNode("cap")
     m.stripeRed = m.top.findNode("stripeRed")
     m.stripeOrange = m.top.findNode("stripeOrange")
+    m.kidBadgeBg = m.top.findNode("kidBadgeBg")
+    m.kidBadgeLabel = m.top.findNode("kidBadgeLabel")
 end sub
 
 sub onContent()
@@ -20,6 +22,11 @@ sub onContent()
         line = line + c.shortDescriptionLine1
     end if
     m.cap.text = line
+    ' kidSafe is omitted (invalid), not false, until overrides/TMDB data exists (Phase 4) —
+    ' badge only ever shows once that data is genuinely known, never on a guess.
+    showKidBadge = (c.kidSafe = true)
+    m.kidBadgeBg.visible = showKidBadge
+    m.kidBadgeLabel.visible = showKidBadge
 end sub
 
 sub onFocusChange()

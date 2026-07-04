@@ -22,7 +22,8 @@ Roku code edits.
 | `/map` | GET | **live (P2)** | browser viewer for the map PNG (manual refresh + zoom/layer toggles) — troubleshooting & off‑TV usage |
 | `/api/view` | GET·POST | **live** | shared map view-state — layer visibility (+ reserved `baseSource`); every browser AND the Roku glass render the same layers |
 | `/api/media?type=trips` | GET | **live (P1)** | home‑media collections (trips/drone/memories/unsorted) |
-| `/api/media?type=movies\|tv\|kids` | GET | reserved | studio library — empty `collections` until built |
+| `/api/media?type=movies` | GET | **live (Workstream A, Phase 1)** | studio library — Movies, grouped into curated-row categories |
+| `/api/media?type=tv` | GET | reserved | studio library — TV Shows, lands in a later phase |
 | `/api/collections/<id>` | GET | **live (P1)** | items (videos+photos) within one collection |
 | `/media/<path>` | GET | **live (P1)** | faststart H.264 MP4 / JPEG, **HTTP Range** (206) |
 | `/api/level.png` | GET | P2 | pre‑rendered leveling bubble PNG |
@@ -171,7 +172,34 @@ unchanged). The Roku reads `catalog.json` (rebuilt from per‑item sidecars by
   `Accept-Ranges: bytes`).
 - **MP4s are faststart + CFR**, H.264 High@L4.2 ≤1080p (the gold‑standard encode profile).
 - `captureDatetime` is ISO‑8601 with offset; the Roku formats its own display label.
-- The studio `type=movies|tv|kids` catalog is reserved — currently returns empty `collections`.
+- The studio `type=tv` catalog is reserved — currently returns empty `collections`. (`type=kids`
+  was reserved here originally; resolved 2026-07-04 as a per-item `kidSafe` flag on movies/tv
+  items instead of its own catalog — no `type=kids` value exists.)
+
+## Studio library: Movies (Workstream A, Phase 1)
+
+Personally-owned library, root‑relative under `/media/movies/...` — a separate served root
+from `MEDIA_ROOT` (`STUDIO_ROOT`), so broadening studio coverage can never change how Trips
+URLs resolve. Movies are **curated rows** (categories), not a flat grid — Phase 1 emits a
+single `"all"` category; once `kidSafe`/genre data exists (overrides + TMDB, a later phase)
+more named categories can appear here with no Roku-side change needed. Same omit‑not‑null
+rule as Trips.
+
+```jsonc
+// GET /api/media?type=movies  — one row per category
+{ "schemaVersion": 1, "type": "movies",
+  "collections": [
+    { "id": "all", "kind": "category", "title": "All Movies",
+      "itemCount": 136, "detailUrl": "/api/collections/all" } ] }
+
+// GET /api/collections/<categoryId>  — items within a category (same route Trips uses)
+{ "schemaVersion": 1, "id": "all", "kind": "category", "title": "All Movies",
+  "items": [
+    { "id": "cars-2006", "type": "video", "title": "Cars",
+      "url": "/media/movies/Cars (2006)/Cars (2006).mp4", "year": "2006",
+      "poster": "...",       // omitted until TMDB fetch lands (later phase)
+      "kidSafe": true } ] }  // omitted until overrides/TMDB data exists
+```
 
 ## Trip + fuel entry (C2 / C3)
 

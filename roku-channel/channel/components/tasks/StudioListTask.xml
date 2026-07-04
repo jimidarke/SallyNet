@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  StudioListTask — off-render-thread fetch of the Movies studio-library catalog.
+  Builds a rows-as-categories ContentNode tree (Movies are curated rows, not a flat
+  grid — Phase 1 emits a single "All Movies" row) for MediaScreen's Movies pane. Same
+  collections-then-items fetch shape as MediaListTask. TV (type=tv) lands in a later phase.
+-->
+<component name="StudioListTask" extends="Task">
+    <interface>
+        <field id="movieCatalog" type="node" />
+        <field id="ok" type="boolean" value="false" />
+    </interface>
+    <script type="text/brightscript" uri="StudioListTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Http.brs" />
+</component>

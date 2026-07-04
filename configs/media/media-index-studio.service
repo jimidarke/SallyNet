@@ -1,0 +1,18 @@
+[Unit]
+Description=SallyNet studio library index — scan Movies/TV into movies.json/tv.json
+After=network-online.target
+# Filesystem scan only (no ffmpeg); still idle priority so it never starves gpsd / sally-api
+# on the Pi 3B+, matching media-encode.service.
+
+[Service]
+Type=oneshot
+User=pi
+EnvironmentFile=-/opt/sally/media/sally-media.conf
+Environment=SALLY_API_DIR=/opt/sally/sally-api
+ExecStart=/opt/sally/media/media-index-studio.py
+Nice=15
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+
+[Install]
+WantedBy=multi-user.target

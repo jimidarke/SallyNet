@@ -39,6 +39,14 @@ MEDIA_ROOT = os.environ.get("MEDIA_ROOT", "/mnt/usb/home/library")
 CATALOG_JSON = os.environ.get("CATALOG_JSON", "/var/lib/sally/catalog.json")
 INBOX_DIR = os.environ.get("INBOX_DIR", "/mnt/usb/home/inbox")
 
+# --- studio library: Movies / TV (Workstream A) ------------------------------
+# Personally-owned library, a sibling of home/ on the same disk (confirmed live:
+# STUDIO_ROOT/movies/<Title (Year)>/..., STUDIO_ROOT/tv/<Show>/Season N/...) — kept
+# separate from MEDIA_ROOT so broadening it can never change how existing Trips URLs
+# resolve (see _safe_media_path's dispatch in app.py).
+STUDIO_ROOT = os.environ.get("STUDIO_ROOT", "/mnt/usb")
+MOVIES_JSON = os.environ.get("MOVIES_JSON", "/var/lib/sally/movies.json")
+
 # --- trip + fuel logs (C2 / C3) ----------------------------------------------
 # Canonical read-models on the Pi's LOCAL disk (SD), NOT the media disk — these need
 # crash-safe atomic writes, and small wear-sensitive state belongs on the SD. trips.json
