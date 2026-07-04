@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- MediaScreen — Trips | Movies | TV Shows tab strip. Each pane is a RowList (one row
-     per collection/category); the tab row reuses the twin red/orange stripe focus
-     language from NavTile/MediaCard rather than a differently-sized reused component.
-     MainScene sets videoCatalog/movieCatalog; selecting an item publishes selectedItem. -->
-<component name="MediaScreen" extends="Group" initialFocus="rows">
+<!-- MediaScreen — Movies | TV Shows tab strip (the pre-encoded studio library). Each pane
+     is a RowList (one row per curated category); the tab row reuses the twin red/orange
+     stripe focus language from NavTile/MediaCard. Defaults to Movies. Guest-uploaded
+     Trips (photos+videos) now live on their own TripsScreen, reached from Home.
+     MainScene sets movieCatalog (and tvCatalog in Phase 3); selecting a Movies item
+     publishes selectedItem (→ VodPlayer). -->
+<component name="MediaScreen" extends="Group" initialFocus="moviesRows">
     <interface>
-        <field id="videoCatalog" type="node" onChange="onCatalog" />
         <field id="movieCatalog" type="node" onChange="onMovieCatalog" />
+        <field id="tvCatalog" type="node" onChange="onTvCatalog" />
         <field id="selectedItem" type="assocarray" alwaysNotify="true" />
+        <field id="selectedShow" type="assocarray" alwaysNotify="true" />
         <!-- Re-declared to hook onChange: resets tab-row focus tracking every time the
-             screen is (re-)shown, since initialFocus="rows" always re-focuses the active
-             pane's list but wouldn't otherwise reset our own m.onTabRow bookkeeping. -->
+             screen is (re-)shown, since initialFocus="moviesRows" always re-focuses the
+             active pane's list but wouldn't otherwise reset our own m.onTabRow bookkeeping. -->
         <field id="visible" type="boolean" onChange="onVisibleChange" />
     </interface>
     <script type="text/brightscript" uri="MediaScreen.brs" />
@@ -31,47 +34,20 @@
              returns focus to the active pane. Focus lives on this inert Group (not any
              one Label) so the active RowList genuinely releases D-pad input while browsing tabs. -->
         <Group id="tabRow">
-            <Label id="tabTrips" translation="[60, 148]" width="140" height="36"
-                   color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="Trips" />
-            <Rectangle id="tabTripsStripeRed" translation="[60, 186]" width="130" height="4" color="0xC8462EFF" visible="false" />
-            <Rectangle id="tabTripsStripeOrange" translation="[60, 190]" width="130" height="4" color="0xE8702EFF" visible="false" />
+            <Label id="tabMovies" translation="[60, 148]" width="140" height="36"
+                   color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="Movies" />
+            <Rectangle id="tabMoviesStripeRed" translation="[60, 186]" width="130" height="4" color="0xC8462EFF" visible="false" />
+            <Rectangle id="tabMoviesStripeOrange" translation="[60, 190]" width="130" height="4" color="0xE8702EFF" visible="false" />
 
-            <Label id="tabMovies" translation="[230, 148]" width="140" height="36"
-                   color="0x2B2A26AA" font="font:MediumBoldSystemFont" text="Movies" />
-            <Rectangle id="tabMoviesStripeRed" translation="[230, 186]" width="130" height="4" color="0xC8462EFF" visible="false" />
-            <Rectangle id="tabMoviesStripeOrange" translation="[230, 190]" width="130" height="4" color="0xE8702EFF" visible="false" />
-
-            <Label id="tabTv" translation="[400, 148]" width="160" height="36"
+            <Label id="tabTv" translation="[230, 148]" width="160" height="36"
                    color="0x2B2A26AA" font="font:MediumBoldSystemFont" text="TV Shows" />
-            <Rectangle id="tabTvStripeRed" translation="[400, 186]" width="150" height="4" color="0xC8462EFF" visible="false" />
-            <Rectangle id="tabTvStripeOrange" translation="[400, 190]" width="150" height="4" color="0xE8702EFF" visible="false" />
+            <Rectangle id="tabTvStripeRed" translation="[230, 186]" width="150" height="4" color="0xC8462EFF" visible="false" />
+            <Rectangle id="tabTvStripeOrange" translation="[230, 190]" width="150" height="4" color="0xE8702EFF" visible="false" />
         </Group>
 
-        <Group id="tripsPane">
-            <RowList id="rows" translation="[60, 200]"
-                     itemComponentName="MediaCard"
-                     numRows="2"
-                     rowItemSize="[[300, 224]]"
-                     rowHeights="[260]"
-                     rowItemSpacing="[[20, 0]]"
-                     itemSize="[1800, 524]"
-                     rowLabelOffset="[[0, 8]]"
-                     showRowLabel="[true]"
-                     rowTitleComponentName=""
-                     focusBitmapBlendColor="0x00000000"
-                     drawFocusFeedback="false"
-                     vertFocusAnimationStyle="floatingFocus"
-                     rowFocusAnimationStyle="fixedFocusWrap" />
-
-            <!-- empty state (Trips only — Movies/TV always have server-side content today) -->
-            <Label id="empty" translation="[0, 280]" width="1800" horizAlign="center"
-                   color="0x2B2A26AA" font="font:LargeBoldSystemFont"
-                   text="No videos yet — scan the QR on the Photos screen to send some!" visible="false" />
-        </Group>
-
-        <!-- Movies pane: same RowList pattern as Trips (curated rows = categories,
-             Phase 1 emits just "All Movies"). -->
-        <Group id="moviesPane" visible="false">
+        <!-- Movies pane: curated rows = categories (genre / Recently Added / Kids & Family /
+             All Movies, produced server-side). Default tab. -->
+        <Group id="moviesPane">
             <RowList id="moviesRows" translation="[60, 200]"
                      itemComponentName="MediaCard"
                      numRows="2"
@@ -88,15 +64,29 @@
                      rowFocusAnimationStyle="fixedFocusWrap" />
         </Group>
 
-        <!-- TV Shows pane: inert placeholder, built out in a later phase. -->
+        <!-- TV Shows pane: rows-as-categories of show cards; selecting a show drills into
+             EpisodesScreen. Empty state until TV content is on disk. -->
         <Group id="tvPane" visible="false">
-            <Label translation="[60, 280]" width="1800" horizAlign="center"
+            <RowList id="tvRows" translation="[60, 200]"
+                     itemComponentName="MediaCard"
+                     numRows="2"
+                     rowItemSize="[[300, 224]]"
+                     rowHeights="[260]"
+                     rowItemSpacing="[[20, 0]]"
+                     itemSize="[1800, 524]"
+                     rowLabelOffset="[[0, 8]]"
+                     showRowLabel="[true]"
+                     rowTitleComponentName=""
+                     focusBitmapBlendColor="0x00000000"
+                     drawFocusFeedback="false"
+                     vertFocusAnimationStyle="floatingFocus"
+                     rowFocusAnimationStyle="fixedFocusWrap" />
+            <Label id="tvEmpty" translation="[0, 480]" width="1920" horizAlign="center"
                    color="0x2B2A26AA" font="font:LargeBoldSystemFont"
-                   text="TV Shows — coming soon" />
+                   text="TV Shows will appear here once they're loaded." visible="false" />
         </Group>
 
-        <!-- focused-item detail strip: shared across panes, reflects whichever item is
-             currently focused in the active pane. -->
+        <!-- focused-item detail strip: reflects whichever item is focused in the active pane. -->
         <Label id="detail" translation="[60, 980]" width="1800" height="60"
                color="0x2B2A26FF" font="font:MediumSystemFont" text="" />
     </children>

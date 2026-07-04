@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- MediaCard — RowList item: poster + caption + twin red/orange focus stripe.
+<!-- MediaCard — RowList item: poster + caption + twin red/orange focus stripe. A muted
+     placeholder sits behind the poster (so a slow/missing poster never blanks), the poster
+     fades in on load, and the whole card scales up slightly with focus (Netflix zoom).
      RowList sets itemContent (a browse ContentNode) and focusPercent on each item. -->
 <component name="MediaCard" extends="Group">
     <interface>
@@ -11,8 +13,14 @@
     <script type="text/brightscript" uri="MediaCard.brs" />
     <script type="text/brightscript" uri="pkg:/source/Config.brs" />
     <children>
+        <!-- placeholder shown until (or when there is no) poster -->
+        <Rectangle id="bg" width="300" height="169" color="0xD8C9B0FF" />
         <Poster id="poster" width="300" height="169" loadDisplayMode="scaleToZoom"
-                uri="pkg:/images/transparent.png" />
+                uri="pkg:/images/transparent.png" opacity="0.0" />
+        <Animation id="fadeIn" duration="0.28" easeFunction="outQuad">
+            <FloatFieldInterpolator id="fadeInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]"
+                                    fieldToInterp="poster.opacity" />
+        </Animation>
         <!-- kidSafe badge: only shown once overrides/TMDB data sets itemContent.kidSafe -->
         <Rectangle id="kidBadgeBg" translation="[6, 6]" width="70" height="26" color="0x6B9080FF" visible="false" />
         <Label id="kidBadgeLabel" translation="[12, 10]" width="60" height="20"

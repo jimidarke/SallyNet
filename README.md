@@ -17,11 +17,11 @@ Each folder under `subsystems/` covers one functional area. Each one has a READM
 | Folder | What it covers |
 |---|---|
 | [`subsystems/network/`](subsystems/network/) | QX210-NW2 4G LTE router, WiFi-as-WAN, captive portal handling |
-| [`subsystems/media/`](subsystems/media/) | TV, HDMI selector, Roku (sideload target), USB/SD player |
-| [`subsystems/compute/`](subsystems/compute/) | Raspberry Pi 3B+ + ~1TB SSD + RetroPie + Samba/DLNA media server |
+| [`subsystems/media/`](subsystems/media/) | TV, HDMI selector, sideloaded SallyNet Roku channel (Trips/Movies/TV via `sally-api`), USB/SD player |
+| [`subsystems/compute/`](subsystems/compute/) | Raspberry Pi 3B+ + ~1TB SSD — RetroPie/Samba/DLNA, plus `sally-api` + gpsd (Phase-0/2 stopgap; migrates to a planned mini-PC) |
 | [`subsystems/lighting/`](subsystems/lighting/) | WLED ambient lighting (ESP32 + WS2811 12V strips) |
 | [`subsystems/comms/`](subsystems/comms/) | FRS family radios, cell booster |
-| [`subsystems/gps/`](subsystems/gps/) | VK-162 USB GPS, gpsd, Traccar |
+| [`subsystems/gps/`](subsystems/gps/) | u-blox 8 GNSS receiver, gpsd, ambient map/nav screen |
 | [`subsystems/tanks/`](subsystems/tanks/) | Fresh/grey/black tank level sensors, propane (hands-off) |
 | [`subsystems/power/`](subsystems/power/) | 12V house battery, charging, voltage-drop diagnosis, shunt monitor |
 | [`subsystems/telemetry/`](subsystems/telemetry/) | Fuel economy vs conditions, BLE wheel sensor, BME280, engine bay temp, cabin pinpad UI |

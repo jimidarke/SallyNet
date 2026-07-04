@@ -91,6 +91,18 @@ class MoviesApiTests(unittest.TestCase):
         r = self.c.get("/media/trips/some-trip/videos/x.mp4")
         self.assertEqual(r.status_code, 404)
 
+    def test_media_file_serves_art_poster_from_studio_root(self):
+        # TMDB posters cache to STUDIO_ROOT/.art/<id>.jpg and are served root-relative as
+        # /media/.art/<id>.jpg — needs ".art" in the studio dispatch set.
+        art_dir = os.path.join(self.studio_root, ".art")
+        os.makedirs(art_dir)
+        with open(os.path.join(art_dir, "cars-2006.jpg"), "wb") as f:
+            f.write(b"\xff\xd8\xffJPEGDATA")
+        r = self.c.get("/media/.art/cars-2006.jpg")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data, b"\xff\xd8\xffJPEGDATA")
+        self.assertEqual(r.headers["Content-Type"], "image/jpeg")
+
     def test_media_file_multi_chunk_range_is_byte_correct(self):
         # Regression for the chunk-size reduction (mitigates a waitress disk-buffer
         # race on client disconnect, see git history): a range spanning many chunks
@@ -104,6 +116,64 @@ class MoviesApiTests(unittest.TestCase):
                         headers={"Range": "bytes=100-150099"})
         self.assertEqual(r.status_code, 206)
         self.assertEqual(r.data, payload[100:150100])
+
+
+class TvApiTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.tv_json = os.path.join(self.tmp, "tv.json")
+        self._old_tv = app._tv
+        self._old_fix = app._cached_fix
+        app._tv = store.CachedJson(self.tv_json, {"collections": [], "items": {}, "shows": {}})
+        app._cached_fix = lambda: {"fix": False, "lat": None, "lon": None}
+        self.c = app.app.test_client()
+
+    def tearDown(self):
+        app._tv = self._old_tv
+        app._cached_fix = self._old_fix
+
+    def _seed(self):
+        store.atomic_write_json(self.tv_json, {
+            "collections": [{"id": "tv-all", "kind": "category", "title": "All Shows",
+                             "itemCount": 1, "detailUrl": "/api/collections/tv-all"}],
+            "items": {"tv-all": [{"id": "bluey-2018", "type": "show", "title": "Bluey",
+                                  "seasonCount": 1, "episodeCount": 1,
+                                  "detailUrl": "/api/show/bluey-2018"}]},
+            "shows": {"bluey-2018": {"id": "bluey-2018", "kind": "show", "title": "Bluey",
+                                     "seasons": [{"season": 1, "id": "bluey-2018-s01",
+                                                  "title": "Season 1", "episodeCount": 1,
+                                                  "episodes": [{"id": "bluey-2018-s01e01",
+                                                                "type": "video", "season": 1,
+                                                                "episode": 1, "title": "Magic",
+                                                                "url": "/media/tv/x.mp4"}]}]}},
+        })
+        app._tv.invalidate()
+
+    def test_type_tv_empty_when_unseeded(self):
+        d = self.c.get("/api/media?type=tv").get_json()
+        self.assertEqual(d["collections"], [])
+
+    def test_type_tv_returns_show_rows_when_seeded(self):
+        self._seed()
+        d = self.c.get("/api/media?type=tv").get_json()
+        self.assertEqual(d["type"], "tv")
+        self.assertEqual(d["collections"][0]["id"], "tv-all")
+
+    def test_collections_tv_all_returns_show_cards(self):
+        self._seed()
+        d = self.c.get("/api/collections/tv-all").get_json()
+        self.assertEqual(d["items"][0]["id"], "bluey-2018")
+        self.assertEqual(d["items"][0]["type"], "show")
+
+    def test_show_detail_returns_seasons_and_episodes(self):
+        self._seed()
+        d = self.c.get("/api/show/bluey-2018").get_json()
+        self.assertEqual(d["kind"], "show")
+        self.assertEqual(d["seasons"][0]["episodes"][0]["id"], "bluey-2018-s01e01")
+
+    def test_show_detail_unknown_is_404(self):
+        self._seed()
+        self.assertEqual(self.c.get("/api/show/nope").status_code, 404)
 
 
 if __name__ == "__main__":

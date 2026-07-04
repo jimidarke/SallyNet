@@ -137,7 +137,7 @@ browser and the Roku render identically.
 - The map's ETA/POI feeds are the `trip-eta` / `waypoint-eta` / `poi-refresh` timers writing
   `route.json` / `waypoint-route.json` / `poi-cache.json` on the SD. `mapgen` reuses a
   cached frame (`MAP_MIN_RENDER_INTERVAL_S` moving, `MAP_PARKED_TTL_S` parked) so Roku polls
-  don't re-render identical frames. Tuning detail: `mapoptimize.md`.
+  don't re-render identical frames. Tuning detail: `subsystems/gps/map-tile-hardening.md`.
 
 ## Maintenance guardrails (and the why)
 

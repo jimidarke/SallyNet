@@ -105,7 +105,7 @@ LTE gives mostly-available uplink; the design must survive multi-hour dead stret
   Hobby plan (and the $125 Solo plan) **forbid server-side disk caching + pre-seeding** — those need
   the Small Business tier ($255/mo) or a custom arrangement. So the "cache-forever + `map-preseed.py`"
   design requires a **paid/custom Thunderforest plan** (being arranged); until that lands, the
-  tile-fetch hardening (`mapoptimize.md` — negative cache + circuit breaker + 429/Retry-After) keeps
+  tile-fetch hardening (`map-tile-hardening.md` — negative cache + circuit breaker + 429/Retry-After) keeps
   request rates polite. Key lives in the gitignored `.env` → written to `/opt/sally/sally-api.env` by
   `deploy-sally-api.sh`. PMTiles (self-rendered from OSM/ODbL) stays the documented N100-era
   fully-offline + fully-compliant upgrade behind `tiles.fetch_tile()`.

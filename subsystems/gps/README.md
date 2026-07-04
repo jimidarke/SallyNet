@@ -32,7 +32,9 @@ References:
 2. ✅ Exposed to the dashboard — `sally-api` `/api/state` reads gpsd; the SallyNet Roku channel polls it.
 3. ✅ **Ambient map / navigation screen (2026-06-27)** — server-composited `/api/map.png` (basemap +
    breadcrumb trail + waypoint pins + POI + heading arrow + status strip) on a Roku `MapScreen`.
-   Design + resolved decisions: [`map-navigation-brainstorm.md`](map-navigation-brainstorm.md).
+   Design + resolved decisions: [`map-navigation-brainstorm.md`](map-navigation-brainstorm.md);
+   tile-fetch hardening (negative cache + circuit breaker for a throttling provider):
+   [`map-tile-hardening.md`](map-tile-hardening.md).
 4. (optional) Traccar for family location sharing — check the `homeController` estate for an instance, or skip in favour of the in-rig dashboard.
 
 ## Mode derivation (4-state, 2026-06-27)

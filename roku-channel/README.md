@@ -14,12 +14,17 @@ watchdog/backoff). Part of the **sallyNet monorepo**; backend contract at `../su
 images/                 # source art (mascot) — NOT shipped in the .pkg
 channel/                # the Roku project (sideload root)
   manifest  bsconfig.json  package.json
-  source/    main.brs · Config.brs (palette/registry/log) · Api.brs (URL builders)
+  source/    main.brs · Config.brs (palette/registry/log) · Http.brs (shared roUrlTransfer
+             helper) · Media.brs · Api.brs (URL builders)
   components/
     MainScene.{xml,brs}        # route stack + modeController + poll owner
-    screens/  SplashScreen · HomeHub · DriveScreen   (+ Camp/Media/Cameras/Systems/Photos later)
-    widgets/  NavTile
-    tasks/    StatePollTask     # GET /api/state -> field
+    screens/  SplashScreen · HomeHub · DriveScreen · CampScreen · MapScreen ·
+              MediaScreen (Trips/Movies/TV tab strip) · TripsScreen · EpisodesScreen
+              (season/episode drill-in) · VodPlayer · PhotoGallery · QrScreen
+              (+ Cameras/Systems later)
+    widgets/  NavTile · MediaCard
+    tasks/    StatePollTask (GET /api/state) · MediaListTask · StudioListTask ·
+              ShowDetailTask (GET /api/show/<id>)
   scripts/   deploy.js · generate_brand_assets.py
 ```
 

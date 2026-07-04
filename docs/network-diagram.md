@@ -1,6 +1,9 @@
 # Network Diagram
 
-How Sally's boxes are wired together as of 2026-05-17. Update when topology changes.
+How Sally's boxes are wired together as of 2026-05-17 (physical/logical wiring only — this
+doesn't track every service added since; see `subsystems/network/remote-access-vpn.md` for the
+WireGuard site node and `subsystems/network/lte-monitoring.md` for the LTE monitor, both added
+after this date). Update when topology changes.
 
 **Planned addition (v0.2.0):** an Intel N100-class mini-PC becomes the always-on services host (audio, telemetry, Roku media HTTP, MQTT broker, gpsd) — shown dashed below until it physically lands. Pi 3B+ stays as the pure RetroPie appliance (today it's a hybrid — also Samba/DLNA/metrics + a WireGuard site node; see `subsystems/compute/`).
 
@@ -24,7 +27,7 @@ How Sally's boxes are wired together as of 2026-05-17. Update when topology chan
        ▼                         ▼
 ┌──────────────────────────────────────────────┐
 │  QX210-NW2 Industrial 4G LTE WiFi Router     │
-│  (LEDE/OpenWrt; SSH-managed)                 │
+│  (LEDE/OpenWrt; LuCI-managed, SSH disabled)  │
 │                                              │
 │  WAN options:                                │
 │   - Cell uplink (default on the road)        │
@@ -38,9 +41,9 @@ How Sally's boxes are wired together as of 2026-05-17. Update when topology chan
 ┌──────────────────┐   ┌─────────────────────────┐    ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
 │ Roku             │   │ Raspberry Pi 3B+        │      Mini-PC (Intel N100,
 │ (Netflix +       │   │  - RetroPie + 2 ctrls   │    │ planned v0.2.0)         │
-│  future Sally    │   │  (after v0.2.0: pure    │      - Snapcast server
-│  channel via     │   │   RetroPie appliance)   │    │ - MPD + librespot       │
-│  sideload)       │   │                         │      - PipeWire audio graph
+│  sideloaded      │   │  (after v0.2.0: pure    │      - Snapcast server
+│  SallyNet        │   │   RetroPie appliance)   │    │ - MPD + librespot       │
+│  channel)        │   │                         │      - PipeWire audio graph
 └────────┬─────────┘   │  (SSD migrates to       │    │ - gpsd + Traccar        │
          │ HDMI        │   mini-PC)              │      - MQTT broker
          │             └──────────┬──────────────┘    │ - Roku media HTTP       │
@@ -54,7 +57,6 @@ How Sally's boxes are wired together as of 2026-05-17. Update when topology chan
          ▼                        ▼                              ▼
    ┌────────────────────┐
    │ HDMI input         │◀ (all three HDMI sources feed here)
-   │ selector (manual)  │
    │ selector (manual)  │
    └─────────┬──────────┘
              │ HDMI
@@ -81,9 +83,9 @@ How Sally's boxes are wired together as of 2026-05-17. Update when topology chan
 
 ## Notes
 
-- The Pi↔router **serial** link is *not wired yet* — no USB-RS232 adapter is present; the Pi's GPIO UART (`/dev/serial0`, PL011) is now enabled and ready (see `subsystems/network/router-serial-uart.md`). Earlier plan was "console override" — that won't work (router RS232 is a DTU). Pi controls the router over SSH/UCI instead; serial is only for the DTU data path.
+- The Pi↔router **serial** link is *not wired yet* — no USB-RS232 adapter is present; the Pi's GPIO UART (`/dev/serial0`, PL011) is now enabled and ready (see `subsystems/network/router-serial-uart.md`). Earlier plan was "console override" — that won't work (router RS232 is a DTU). The Pi controls the router over the **LuCI HTTP API** instead (SSH/dropbear is disabled on this router — see `subsystems/network/README.md`); serial is only for the DTU data path.
 - Cell booster is acoustically/electrically separate from the router — it boosts the carrier RF before it reaches the router's modem. Mounting rule of thumb: outside antenna in front, inside antenna behind, with enough physical separation to avoid oscillation.
-- HDMI selector is manual today. The **SallyNet channel** on the Roku (Phase 0 built; media playback lands in Phase 1) will subsume most of what the AGPtek does, reducing how often the selector needs to be touched.
+- HDMI selector is manual today. The **SallyNet channel** on the Roku (sideloaded + live, Trips/Movies/TV media playback built) is subsuming what the AGPtek does, reducing how often the selector needs to be touched.
 - The backup-cam head is its own world right now (composite display up front). The driving-mode plan in `subsystems/media/` routes its RCA out through a composite-capture dongle on the mini-PC and re-publishes it as an MJPEG/HLS stream the Roku channel can consume — overlaid with a GPS map panel from the mini-PC's gpsd.
 - **Mini-PC plus three new audio paths** are coming with v0.2.0:
   - Snapcast over the QX210's WiFi LAN to phones (each phone runs the Snapcast app; phone's BT pairs to user's headphones)

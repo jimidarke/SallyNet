@@ -8,6 +8,7 @@
 <component name="StudioListTask" extends="Task">
     <interface>
         <field id="movieCatalog" type="node" />
+        <field id="tvCatalog" type="node" />
         <field id="ok" type="boolean" value="false" />
     </interface>
     <script type="text/brightscript" uri="StudioListTask.brs" />

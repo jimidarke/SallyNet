@@ -30,7 +30,9 @@ What changed (realized in Phase 1, below):
 - Replaced `DiscoveryTask` (SSDP) with the fixed `sally-api` base URL (registry `apiBase`, default `http://192.168.2.216:8090`; overridable by ECP deep-link). No mDNS — the LAN IP is canonical.
 - The backend exposes `GET /api/media?type=trips` + `GET /api/collections/<id>` + `GET /api/photos` + `GET /media/<path>` (HTTP Range) — on the **Pi today** (`sally-api`), migrating to the N100 at Phase 3 via a base-URL change.
 - `VodPlayer` (adapted from `LiveGroup`) plays the `/media/<path>` MP4s instead of camera streams.
-- Netflix / YouTube deep-link tiles via ECP `/launch/<channelId>?contentId=…` — still to do.
+- Netflix / YouTube launch tiles — still to do. **Not** an in-channel ECP call (Roku disallows a
+  channel issuing ECP commands on itself); routes through `sally-api` as an external controller
+  instead. Design: `netflix-youtube-launch-tiles-plan.md`.
 
 The channel code now lives **in this monorepo at `roku-channel/`** (consolidated 2026-06-26), not a separate repo. This folder holds the deploy/integration notes, the frozen `api-contract.md`, and UX notes.
 
@@ -79,6 +81,31 @@ Roku **Photos → Info** shows `GET /api/qr.png`, so guests on SallyNet scan →
 watchdog, EOF→back); Photos (two-poster slideshow + date/place overlay); `QrScreen`. Surface frozen
 in `api-contract.md`.
 
+## Studio library — Movies / TV (Workstream A) · CODED (2026-07-04, v0.7.0), not yet deployed
+
+The user's **owned** movie/TV library (`/mnt/usb/{movies,tv}`, a second root — `STUDIO_ROOT` —
+kept separate from `MEDIA_ROOT` so it can never touch Trips URLs) is now browsable the same way as
+Trips, curated into rows instead of a flat grid.
+
+- **Indexer:** `scripts/media-index-studio.py` + `services/sally-api/studio_index.py` scan
+  `movies/<Title (Year)>/…` (one item per folder with a video file) and `tv/<Show (Year)>/Season
+  NN/…` (parses `SxxExx`; only playable `.mp4`/`.m4v` episodes surface — pending transfers are
+  hidden, never greyed). Emits `movies.json` / `tv.json` (Pi SD, alongside `catalog.json`).
+- **Posters/metadata:** `services/sally-api/studio_art.py` + `scripts/media-fetch-art.py` match
+  TMDB by title+year, fetch genre + poster art to `STUDIO_ROOT/.art/`, with an ffmpeg frame-grab
+  fallback when offline/unmatched. TV art is override-driven until the pipeline gains TMDB `tv`
+  endpoints. Hand-editable curation overrides: `configs/media/studio-overrides.json` (git-tracked,
+  deploy-installed only-if-absent).
+- **API:** `GET /api/media?type=movies|tv` (curated-row categories) + `GET /api/show/<id>`
+  (seasons/episodes) — frozen in `api-contract.md`.
+- **Roku:** `MediaScreen` is now a **Trips / Movies / TV Shows tab strip** (D-pad Up→tab row,
+  Left/Right→switch, defaults to Trips); Movies reuses the Trips RowList/`MediaCard` mechanism;
+  TV drills show→`EpisodesScreen` (rows-as-seasons, fed by `ShowDetailTask`) with per-episode
+  resume + autoplay-next (`VodPlayer` queue/`advanceToNext`). New `StudioListTask` (sibling of
+  `MediaListTask`).
+- **Status:** coded + tested (backend unit tests + `bsc` lint clean) but **not deployed to
+  hardware** — see "Next action" below.
+
 ## Bonus idea: live backup-cam → Roku with GPS map overlay (rolling)
 
 This is the fun one. While driving, the big TV in the back of the camper shows:
@@ -104,13 +131,18 @@ Caveats:
 2. ✅ Media HTTP service stood up on the **Pi** (`sally-api` `/api/media` + `/media`) — moves to the N100 at Phase 3 (`subsystems/compute/`).
 3. ✅ Built the home-media VOD + photo path (Media RowList, `VodPlayer`, PhotoGallery) — no camera-overlay cruft.
 4. ✅ First sideload to Camperoku — verified live (polls `/api/state`, auto-routes Splash→Home→Drive).
-5. Add deep-link tile for Netflix / YouTube.
-6. **Driving mode** — composite-capture the backup-cam head into the mini-PC → LAN stream → Roku channel `LiveGroup` tile + GPS overlay.
-7. Retire (or relegate) the AGPtek mini 1080 now that the SallyNet channel handles local files (Phase 1 ✅).
+5. ✅ **Studio library + Netflix-style nav (v0.7.0):** Home split into **Media** (Movies/TV) + **Trips**; Movies TMDB genre/poster rows + Continue Watching; **full TV** (shows→episodes, per-episode resume, autoplay-next); ★-on-Home upload QR. *Coded + tested (178 backend + `bsc` lint); not yet deployed to hardware.*
+6. Add deep-link tile for Netflix / YouTube (separate `POST /api/launch` ECP design — see `netflix-youtube-launch-tiles-plan.md`).
+7. **Driving mode** — composite-capture the backup-cam head into the mini-PC → LAN stream → Roku channel `LiveGroup` tile + GPS overlay.
+8. Retire (or relegate) the AGPtek mini 1080 now that the SallyNet channel handles local files.
 
 ## Next action
 
-Phase 1 (Media) is **built + verified live**. Next: load real trip content (drop into
-`/mnt/usb/home/inbox/` or via the QR upload page → encodes on the nightly run), add Netflix/YouTube
-ECP deep-link tiles, and optionally wire `type=movies|tv|kids` so the Roku can also browse the
-existing MiniDLNA movie/TV library. Then Phase 2 (Camp/Systems sensors via MQTT).
+The Netflix-style overhaul (v0.7.0) is **coded + tested** — Home Media/Trips split, Movies TMDB
+genre/poster rows + Continue Watching, full TV (shows→episodes with per-episode resume +
+autoplay-next), and the ★-on-Home upload QR. **Next: deploy + verify on hardware** — push `sally-api`
++ the pipeline to campingpi (`deploy-sally-api.sh` provisions the TMDB key from `.env.tmdb`), run
+`media-fetch-art.py` over LTE to populate posters, sideload the channel to Camperoku, and walk the
+flows (upload photo+video → Trips; Movies posters + rows; ★→QR; seed one TV show → episodes →
+resume + autoplay-next). Then load real movie/TV content onto `/mnt/usb/{movies,tv}`, and Phase 2
+(Camp/Systems sensors via MQTT).

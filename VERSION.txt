@@ -1,6 +1,14 @@
-0.6.1
+0.7.0
 
 ## Changelog
+
+### 0.7.0 (2026-07-04)
+- **Roku Netflix-style navigation + media overhaul — all additive to the frozen `/api` contract (no `schemaVersion`/`SN_CACHE_VER` bump; 178 backend tests + `bsc` lint green). Deployed to hardware 2026-07-04** (sally-api + media pipeline to campingpi, channel sideloaded to Camperoku).
+- **Home / Media / Trips split.** Home separates **Media** (pre-encoded Movies/TV) from **Trips** (guest uploads): the old `Photos` tile became **Trips** (new `TripsScreen`, browsing trip collections with photos *and* videos), and the Media screen collapsed to a **Movies | TV** tab strip **defaulting to Movies**. Pressing **★ on Home** shows the upload QR on demand (closes **C1**), reusing the re-parentable `QrScreen` route.
+- **Movies TMDB categorization + posters (A4).** New `studio_art.py` (stdlib-`urllib`, Buster-safe): TMDB match by title+year (±1 yr guard + confidence), frame-grab fallback offline/unmatched, posters cached self-healingly under `STUDIO_ROOT/.art` (served via a one-line `_STUDIO_DIRS += ".art"`). `build_movie_categories` now emits **Recently Added + Kids & Family + genre rows + All Movies**; items carry `poster`/`genres`/`kidSafe` (kidSafe only when true). Git-tracked `studio-overrides.json` (override > TMDB > default). Incremental nightly (`media-index-studio.py`) + on-demand `media-fetch-art.py --force/--refresh`; creds ride the `TILE_API_KEY` idiom (`.env.tmdb` → `sally-api.env`).
+- **Full TV (A2/A3/A5 tv).** `scan_tv` + `build_tv_read_model` (show→season→episode; only playable `.mp4`/`.m4v` episodes appear, pending hidden for free); `GET /api/media?type=tv` (show-card rows, `tv-*` ids) + new `GET /api/show/<id>`. Roku: `StudioListTask` TV walk, `MediaScreen` TV pane, new `ShowDetailTask` + `EpisodesScreen` drill-in, **per-episode resume for free** (episode id = `contentid`), and **autoplay-next** in `VodPlayer` (cross-season queue, single-decoder-safe). Empty-safe — ships before TV content is re-encoded (A6). *TMDB show-art fetch for TV is override-driven for now (plugs into the same slot when the art pipeline gains TV endpoints).*
+- **Card polish + Continue Watching.** `MediaCard` placeholder→poster fade-in + focus zoom; KIDS badge lights from the new `kidSafe`. Roku-side **Continue Watching** row from `resume:<id>` registry bookmarks (the server holds no playback state).
+- New: `services/sally-api/{studio_art,studio_reindex}.py`, `scripts/media-fetch-art.py`, `configs/media/studio-overrides.json`, Roku `screens/{TripsScreen,EpisodesScreen}` + `tasks/ShowDetailTask`. Tests: `test_studio_art`, `test_studio_reindex`, `test_studio_tv` (+ `test_studio_index`/`test_media_studio_api` extensions).
 
 ### 0.6.1 (2026-06-27)
 - **Media disk replaced: failing HDD → SSD.** Swapped the failing Seagate ST1000LM037 exFAT HDD at `/mnt/usb` for a **Crucial BX500 1 TB SSD** (ext4, label `media`, mounted **by UUID** with `nofail` so a missing disk can't hang the remote Pi's boot). Done live over the WireGuard tunnel; verified clean across a reboot (`findmnt` = SSD, all services up, `/api/health` ok, `get_throttled` back to `0x0`).

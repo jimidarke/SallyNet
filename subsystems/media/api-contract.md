@@ -23,7 +23,8 @@ Roku code edits.
 | `/api/view` | GET·POST | **live** | shared map view-state — layer visibility (+ reserved `baseSource`); every browser AND the Roku glass render the same layers |
 | `/api/media?type=trips` | GET | **live (P1)** | home‑media collections (trips/drone/memories/unsorted) |
 | `/api/media?type=movies` | GET | **live (Workstream A, Phase 1)** | studio library — Movies, grouped into curated-row categories |
-| `/api/media?type=tv` | GET | reserved | studio library — TV Shows, lands in a later phase |
+| `/api/media?type=tv` | GET | **live (Workstream A, Phase 3)** | studio library — TV Shows, curated rows of show cards |
+| `/api/show/<id>` | GET | **live (Workstream A, Phase 3)** | one TV show's seasons + episodes (404 if unknown) |
 | `/api/collections/<id>` | GET | **live (P1)** | items (videos+photos) within one collection |
 | `/media/<path>` | GET | **live (P1)** | faststart H.264 MP4 / JPEG, **HTTP Range** (206) |
 | `/api/level.png` | GET | P2 | pre‑rendered leveling bubble PNG |
@@ -172,9 +173,10 @@ unchanged). The Roku reads `catalog.json` (rebuilt from per‑item sidecars by
   `Accept-Ranges: bytes`).
 - **MP4s are faststart + CFR**, H.264 High@L4.2 ≤1080p (the gold‑standard encode profile).
 - `captureDatetime` is ISO‑8601 with offset; the Roku formats its own display label.
-- The studio `type=tv` catalog is reserved — currently returns empty `collections`. (`type=kids`
-  was reserved here originally; resolved 2026-07-04 as a per-item `kidSafe` flag on movies/tv
-  items instead of its own catalog — no `type=kids` value exists.)
+- The studio `type=tv` catalog is **live** (Phase 3) — genre/curated rows of **show cards**
+  that drill into `/api/show/<id>`; returns empty `collections` until TV content is on disk.
+  (`type=kids` was reserved here originally; resolved 2026-07-04 as a per-item `kidSafe` flag on
+  movies/tv items instead of its own catalog — no `type=kids` value exists.)
 
 ## Studio library: Movies (Workstream A, Phase 1)
 
@@ -200,6 +202,48 @@ rule as Trips.
       "poster": "...",       // omitted until TMDB fetch lands (later phase)
       "kidSafe": true } ] }  // omitted until overrides/TMDB data exists
 ```
+
+## Studio library: TV Shows (Workstream A, Phase 3)
+
+Mirrors Movies, adding a show → season → episode drill-in. Same `STUDIO_ROOT`/`.art` roots and
+omit‑not‑null rule. Disk layout: `tv/<Show (Year)>/Season NN/<Show> - SxxEyy - <Title>.mp4`
+(year + season folder optional); only Roku‑playable `.mp4`/`.m4v` episodes appear, so a
+half‑transferred show simply lists fewer episodes (pending ones are **hidden**, never greyed).
+`type=tv` category ids are namespaced `tv-*` so they never collide with movies' bare ids.
+
+```jsonc
+// GET /api/media?type=tv  — genre/curated rows of SHOW cards (empty [] until content lands)
+{ "schemaVersion": 1, "type": "tv",
+  "collections": [
+    { "id": "tv-all", "kind": "category", "title": "All Shows",
+      "itemCount": 12, "detailUrl": "/api/collections/tv-all" } ] }
+
+// GET /api/collections/tv-all  — show cards (drill targets, NOT directly playable)
+{ "schemaVersion": 1, "id": "tv-all", "kind": "category", "title": "All Shows",
+  "items": [
+    { "id": "bluey-2018", "type": "show", "title": "Bluey", "year": "2018",
+      "seasonCount": 3, "episodeCount": 152,
+      "poster": "/media/.art/bluey-2018/poster.jpg",   // omitted until art data exists
+      "kidSafe": true,                                 // omitted until data exists
+      "detailUrl": "/api/show/bluey-2018" } ] }
+
+// GET /api/show/<id>  — one show's seasons + episodes (404 if unknown)
+{ "schemaVersion": 1, "id": "bluey-2018", "kind": "show", "title": "Bluey", "year": "2018",
+  "poster": "/media/.art/bluey-2018/poster.jpg", "overview": "…", "kidSafe": true, // each omitted if unknown
+  "seasons": [
+    { "season": 1, "id": "bluey-2018-s01", "title": "Season 1", "episodeCount": 2,
+      "episodes": [
+        { "id": "bluey-2018-s01e01", "type": "video", "season": 1, "episode": 1,
+          "title": "Magic Xylophone",
+          "url": "/media/tv/Bluey%20(2018)/Season%2001/Bluey%20-%20S01E01%20-%20Magic%20Xylophone.mp4",
+          "still": "/media/.art/bluey-2018/s01e01.jpg",  // omitted until art data exists
+          "durationSec": 420, "overview": "…" } ] } ] }
+```
+
+- The episode `id` is the Roku VodPlayer `contentid`, so per‑episode resume (`resume:<id>`)
+  works for free, and autoplay‑next advances across seasons. Episode `url`s are percent‑encoded
+  like movie urls. The "Continue Watching" row is built **device‑side** from those bookmarks —
+  the server holds no per‑device playback state.
 
 ## Trip + fuel entry (C2 / C3)
 

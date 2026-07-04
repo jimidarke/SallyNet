@@ -38,33 +38,35 @@ execute as a batch once the plan is settled.
 - [x] Re-verified: Range (206) + traversal guard (403/404) both tested against the new dispatch, movies + trips.
 - [x] `STUDIO_ROOT` + `MOVIES_JSON` added to `sallyconf.py` + `sally-media.conf` (env-overridable, same idiom as everything else there).
 
-### A2 — Backend: studio indexer — movies DONE (2026-07-04), TV not started
+### A2 — Backend: studio indexer — movies + TV DONE (2026-07-04, v0.7.0)
 - [x] New `scripts/media-index-studio.py` + `services/sally-api/studio_index.py` — scans `movies/<Title (Year)>/…`:
   - [x] Movies: one item per folder with a real video file (title/year from folder name; folders with no file yet are silently skipped — the library is mid-transfer, ~24 of 178 folders populated so far).
-  - [ ] TV: dir = show; parse `SxxExx` (and loose patterns) → show / season / episode. **Not started.**
-- [x] `movies.json` emitted (Pi SD, like `catalog.json`); `tv.json` not yet.
+  - [x] TV: dir = show; `scan_tv` parses `SxxExx` (+ loose `NxN`) → show / season / episode; only playable `.mp4`/`.m4v` episodes enter the model (pending hidden for free). **DONE.**
+- [x] `movies.json` + `tv.json` emitted (Pi SD, like `catalog.json`).
 - [ ] Re-encode worklist (A6) — not started (moot until real non-mp4 TV sources exist; almost all current folders are empty placeholders, not un-encoded originals).
-- [ ] Overrides file (`configs/media/studio-overrides.json`) — not built yet. **Decided:** git-tracked + deploy-installed "only if absent" (same precedent as `sally-media.conf`), not media-disk-resident like `trip.json`.
+- [x] Overrides file (`configs/media/studio-overrides.json`) — built; git-tracked + deploy-installed "only if absent" (same precedent as `sally-media.conf`). Movies + shows + episodes maps; match overrides (tmdbId/title/year) at fetch, presentation (genres/kidSafe/poster/still) at build.
 
-### A3 — Backend: API endpoints — movies DONE (2026-07-04), TV not started
+### A3 — Backend: API endpoints — movies + TV DONE (2026-07-04, v0.7.0)
 - [x] `GET /api/media?type=movies` → `{collections:[{id,kind,title,itemCount,detailUrl}]}` (categories, not flat items — see A5 below for why).
-- [ ] `GET /api/media?type=tv` — still reserved/empty.
+- [x] `GET /api/media?type=tv` → show-card rows (`tv-*` namespaced ids); new `GET /api/show/<id>` returns seasons/episodes. Empty until TV content is on disk.
 - [x] `GET /api/collections/<id>` extended to also resolve movie category ids (tries movies, then falls through to the trips catalog/store, same layering as trip stubs).
 - [x] Documented in `subsystems/media/api-contract.md`.
 
-### A4 — Backend: poster/metadata fetch (online → cached) — not started
-- [ ] `scripts/media-fetch-art.py` (TMDB). **Resolved:** creds already provisioned in gitignored `.env.tmdb` (`TMDB_API_KEY` + `TMDB_API_READ_ACCESS_TOKEN`); v3 `api_key` query-param auth (simpler than v4 bearer); art cache dir `STUDIO_ROOT/.art` (no `media/` prefix).
-- [ ] Frame-grab fallback (ffmpeg) when offline / unmatched.
-- [ ] Opportunistic schedule vs. manual run — decide.
+### A4 — Backend: poster/metadata fetch (online → cached) — DONE for Movies (2026-07-04, v0.7.0)
+- [x] `services/sally-api/studio_art.py` + `scripts/media-fetch-art.py` (TMDB v3 `api_key`, stdlib-`urllib`). Match by title+year (±1 yr guard + confidence); genres via `/genre/movie/list`; posters `w342` → `STUDIO_ROOT/.art/<id>.jpg`, served by a one-line `_STUDIO_DIRS += ".art"`.
+- [x] Frame-grab fallback (ffmpeg, the `media-encode-video.sh` recipe) when offline / unmatched.
+- [x] Schedule: nightly `media-index-studio.timer` (incremental — ~0 TMDB calls after first populate) + on-demand `media-fetch-art.py --force/--refresh`. Creds via the `TILE_API_KEY` idiom (`.env.tmdb` → `sally-api.env`).
+- [ ] TV show/episode art via TMDB `tv` endpoints — not yet; TV art is override-driven meanwhile (consumed from the same `.art` index shape, zero further change).
 
-### A5 — Roku: UI restructure — movies + tab strip DONE (2026-07-04), TV not started
+### A5 — Roku: UI restructure — movies + tab strip + full TV DONE (2026-07-04, v0.7.0)
+> **Nav reorg (v0.7.0):** Trips pulled OUT of the Media page into its own Home **Trips** tile (new `TripsScreen`, photos+videos); Media is now a **Movies | TV** tab strip **defaulting to Movies**. Supersedes the "default tab always Trips" decision below.
 - [x] `MediaScreen` reworked into a tab strip (Trips / Movies / TV Shows); D-pad Up focuses the tab row (real SceneGraph focus moves to an inert `tabRow` Group so the active RowList genuinely releases input), Left/Right switches tabs, Down/OK returns to the pane. **Default tab is always Trips** (resolved — not "remember last").
 - [x] **Trips** pane = existing rows-as-trips (unchanged, regression-verified live).
 - [x] **Movies** pane = **reuses the same RowList + MediaCard mechanism as Trips** (curated rows = categories), not a MarkupGrid/`MoviesGrid` — resolved as **curated rows**, not a flat grid. Phase 1 ships one row ("All Movies"); more rows (Kids & Family, genre) can be added later purely server-side, zero Roku changes needed.
-- [ ] **TV Shows** pane = shows grid → `Episodes` screen — not started (placeholder pane in place).
-  - [ ] Per-episode resume bookmark — `VodPlayer` already supports this generically, will fall out "for free" once Episodes exists.
-  - [ ] **Autoplay next episode** — real new `VodPlayer` logic needed, not free reuse (unlike Movies).
-  - Pending-episode display: **resolved as hide entirely** (not grey-disable) — simpler indexer, but TV will look sparse until real files land.
+- [x] **TV Shows** pane = show-card rows → `EpisodesScreen` (rows-as-seasons drill-in, fed by new `ShowDetailTask` from `/api/show/<id>`); empty-safe.
+  - [x] Per-episode resume bookmark — fell out "for free" (composite episode id = `contentid`, so `resume:<id>` is unique per episode).
+  - [x] **Autoplay next episode** — new `VodPlayer` `queue`/`queueIndex` + `advanceToNext` (whole show as a cross-season queue; single-decoder-safe stop→reload on the same Video node).
+  - Pending-episode display: **hide entirely** — `scan_tv` only emits playable `.mp4`/`.m4v` episodes, so this is automatic.
 - [x] New `StudioListTask` (sibling of `MediaListTask`, shares extracted `source/Http.brs`) for `type=movies`; registry cold-start cache **not** added (matches the existing gap — `SN_REG_MEDIA_CATALOG`/`PHOTO_CATALOG` consts have been dead/unused since Trips shipped too).
 - [x] Kid-safe: **resolved as badge/flag only**, no lock/PIN mode. MediaCard has a dormant badge (shows once `kidSafe` data exists, Phase 4). This makes the frozen contract's reserved `type=kids` value unnecessary — struck from `api-contract.md`, `kidSafe` is just an item flag now.
 
@@ -76,8 +78,9 @@ execute as a batch once the plan is settled.
 ### Build order for A
 1. ~~A1 + A2(movies) + A3(movies) + A5(Movies pane)~~ **DONE 2026-07-04.**
 2. ~~A5 tab strip restructure~~ **DONE 2026-07-04.**
-3. A2(tv) + A3(tv) + A5(TV drill-in) + A6 worklist — **next up.**
-4. A4 posters (online fetch + cache + overrides).
+3. ~~A2(tv) + A3(tv) + A5(TV drill-in + autoplay-next)~~ **DONE 2026-07-04 (v0.7.0).** Empty-safe UI; A6 re-encode worklist still pending (moot until real non-mp4 TV sources exist).
+4. ~~A4 posters (online fetch + cache + overrides)~~ **DONE 2026-07-04 (v0.7.0)** for Movies (TMDB match/genre/poster + frame-grab fallback + overrides). TV show-art is override-driven until the art pipeline gains TMDB `tv` endpoints (plugs into the same `.art` slot, zero further change).
+5. **Deploy to hardware — DONE (2026-07-04).** Pi `sally-api` + media pipeline deployed and active on campingpi; `GET /api/media?type=movies` live (24 items, "All Movies" category), `type=tv` live (empty — no non-placeholder show folders yet, expected). Roku channel sideloaded to Camperoku (`npm run deploy` ok). **Live end-to-end verify (remote-in-hand check of the new tab strip / TV drill-in / autoplay-next) still wants a real session at the TV.**
 
 ### Open questions for A — all resolved 2026-07-04
 - [x] Default tab: **always Trips.**
@@ -126,8 +129,8 @@ execute as a batch once the plan is settled.
 - [ ] **Time format everywhere** — `h:mm AM/PM`, localized to the **GPS-derived timezone**, with a zone abbreviation badge (**MT / PT / CT …**) that updates as we cross zones. Needs offline tz-from-GPS (coarse longitude/boundary lookup, no internet). Replace `snClockHM`/`snClockHMS` + any timestamp rendering.
 - [ ] **Weather tile (Home top-right)** — fill the empty top-right of the Home hub with **local weather based on GPS** (fetch over LTE, cache to the SSD for dead zones). Small current-conditions card.
 
-### C1 — Home page push-to-QR
-- [ ] Push a command from the main screen / external trigger to **show the upload QR on demand** (ECP `/input` deep-link or an Info-button surface), so guests can be handed the QR without navigating into Photos.
+### C1 — Home page push-to-QR — DONE (2026-07-04, v0.7.0)
+- [x] Pressing **★ (the `options`/star key) on Home** shows the upload QR on demand (`MainScene.onKeyEvent` → re-parentable `QrScreen` route with `qrParent="home"`), so guests get the QR without navigating into Trips/Photos. (Chose the star key over the ECP `/input` deep-link idea.)
 
 ### C2 — Driver / navigator dashboard (trip entry) — BUILT (2026-06-27)
 - [x] A **navigator entry pad** (`/trip` mobile page → `POST /api/trip`) to enter **trip parameters**: destination, trip name, who came (names), start/end dates. Destination geocoded via Nominatim (LTE), with a **"pin current GPS"** offline fallback. Active trip stored on SD (`/var/lib/sally/trips.json`).

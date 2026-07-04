@@ -43,6 +43,41 @@ sub runFetch()
     end if
     m.top.movieCatalog = root
 
+    ' TV: rows-as-categories whose items are SHOW cards (not playable) — each carries a
+    ' detailUrl the Roku follows into /api/show/<id> (EpisodesScreen). Empty until content.
+    tvroot = createObject("roSGNode", "ContentNode")
+    tv = httpGetJson(snMediaTvUrl())
+    if tv <> invalid and tv.collections <> invalid then
+        for each c in tv.collections
+            durl = ""
+            if c.detailUrl <> invalid then
+                durl = snApiBase() + c.detailUrl
+            else if c.id <> invalid then
+                durl = snCollectionUrl(c.id)
+            end if
+            detail = httpGetJson(durl)
+            if detail <> invalid and detail.items <> invalid then
+                row = invalid
+                for each it in detail.items
+                    if it.type = "show" then
+                        if row = invalid then
+                            row = tvroot.createChild("ContentNode")
+                            row.title = c.title
+                        end if
+                        n = row.createChild("ContentNode")
+                        if it.title <> invalid then n.title = it.title
+                        n.hdPosterUrl = snMediaItemUrl(it.poster)
+                        if it.episodeCount <> invalid then n.shortDescriptionLine1 = snFmtInt(it.episodeCount) + " episodes"
+                        if it.id <> invalid then n.id = it.id
+                        if it.kidSafe <> invalid then n.kidSafe = it.kidSafe
+                        if it.detailUrl <> invalid then n.detailUrl = snApiBase() + it.detailUrl
+                    end if
+                end for
+            end if
+        end for
+    end if
+    m.top.tvCatalog = tvroot
+
     m.top.ok = true
-    slEvent("movie_catalog", { rows: root.getChildCount() })
+    slEvent("movie_catalog", { rows: root.getChildCount(), tvRows: tvroot.getChildCount() })
 end sub

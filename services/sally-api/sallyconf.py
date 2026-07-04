@@ -46,6 +46,23 @@ INBOX_DIR = os.environ.get("INBOX_DIR", "/mnt/usb/home/inbox")
 # resolve (see _safe_media_path's dispatch in app.py).
 STUDIO_ROOT = os.environ.get("STUDIO_ROOT", "/mnt/usb")
 MOVIES_JSON = os.environ.get("MOVIES_JSON", "/var/lib/sally/movies.json")
+TV_JSON = os.environ.get("TV_JSON", "/var/lib/sally/tv.json")
+
+# TMDB artwork + genre enrichment (studio_art.py). Creds come from .env.tmdb, delivered
+# into /opt/sally/sally-api.env by scripts/deploy-sally-api.sh — the exact TILE_API_KEY
+# pattern; nothing is committed. v3 api_key query-param auth (the read token is kept as an
+# escape hatch, unused by v3). With no key the enrichment degrades to frame-grab posters +
+# a Recently Added / All Movies catalog, fully offline. Posters + the index cache under
+# STUDIO_ROOT/.art so /media/.art/<id>.jpg serves them; studio-overrides.json is the
+# git-tracked hand-correction file (genres/kidSafe/poster + match fixes).
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
+TMDB_API_READ_TOKEN = os.environ.get("TMDB_API_READ_ACCESS_TOKEN", "")
+TMDB_API_BASE = os.environ.get("TMDB_API_BASE", "https://api.themoviedb.org/3")
+TMDB_IMAGE_BASE = os.environ.get("TMDB_IMAGE_BASE", "https://image.tmdb.org/t/p")
+TMDB_POSTER_SIZE = os.environ.get("TMDB_POSTER_SIZE", "w342")
+STUDIO_ART_DIR = os.environ.get("STUDIO_ART_DIR", os.path.join(STUDIO_ROOT, ".art"))
+STUDIO_ART_INDEX = os.environ.get("STUDIO_ART_INDEX", os.path.join(STUDIO_ART_DIR, "index.json"))
+STUDIO_OVERRIDES = os.environ.get("STUDIO_OVERRIDES", "/opt/sally/media/studio-overrides.json")
 
 # --- trip + fuel logs (C2 / C3) ----------------------------------------------
 # Canonical read-models on the Pi's LOCAL disk (SD), NOT the media disk — these need
@@ -149,7 +166,7 @@ MAP_GPS_ALERT_AFTER_S = float(os.environ.get("SALLY_GPS_ALERT_AFTER_S", "20"))
 # A failed tile is "cooled" (negative cache) so the next render skips straight to gap-fill
 # instead of re-hitting it; the GLOBAL breaker trips after a burst of failures (or a 429) and
 # serves cache-only for a cooldown so a tarpitting provider is left to recover; a single probe
-# after the cooldown re-closes it. All env-tunable. (See mapoptimize.md.)
+# after the cooldown re-closes it. All env-tunable. (See subsystems/gps/map-tile-hardening.md.)
 TILE_TIMEOUT_S = float(os.environ.get("TILE_TIMEOUT_S", "4"))            # per-tile HTTP timeout
 TILE_FAIL_COOLDOWN_S = float(os.environ.get("TILE_FAIL_COOLDOWN_S", "60"))  # negative-cache TTL
 TILE_BREAKER_FAILS = int(os.environ.get("TILE_BREAKER_FAILS", "6"))     # fails in window -> trip

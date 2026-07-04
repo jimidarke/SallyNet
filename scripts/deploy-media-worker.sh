@@ -23,7 +23,7 @@ sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/media-track-logger.py" "$REPO/scripts/media-reindex.py" \
   "$REPO/scripts/trip-eta-refresh.py" "$REPO/scripts/waypoint-eta-refresh.py" \
   "$REPO/scripts/poi-refresh.py" "$REPO/scripts/map-preseed.py" "$REPO/scripts/nav-tick.py" \
-  "$REPO/scripts/media-index-studio.py" \
+  "$REPO/scripts/media-index-studio.py" "$REPO/scripts/media-fetch-art.py" \
   "$PI_USER@$PI_HOST:/opt/sally/media/"
 sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/lib/" "$PI_USER@$PI_HOST:/opt/sally/media/lib/"
@@ -34,6 +34,12 @@ sshpass -e scp "${SSH_OPTS[@]}" "$REPO/configs/media/sally-media.conf" \
   "$PI_USER@$PI_HOST:/tmp/sally-media.conf"
 sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
   "[ -f /opt/sally/media/sally-media.conf ] || mv /tmp/sally-media.conf /opt/sally/media/sally-media.conf; rm -f /tmp/sally-media.conf"
+
+header "installing studio-overrides.json (only if absent — never clobber hand edits)"
+sshpass -e scp "${SSH_OPTS[@]}" "$REPO/configs/media/studio-overrides.json" \
+  "$PI_USER@$PI_HOST:/tmp/studio-overrides.json"
+sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
+  "[ -f /opt/sally/media/studio-overrides.json ] || mv /tmp/studio-overrides.json /opt/sally/media/studio-overrides.json; rm -f /tmp/studio-overrides.json"
 
 header "installing systemd units"
 for u in media-track-logger.service media-encode.service media-encode.timer \

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- ShowDetailTask — off-render-thread fetch of /api/show/<id>. Builds a rows-as-seasons
+     ContentNode tree (items = episode cards) for EpisodesScreen, plus episodesFlat: the
+     same episodes as plain assocs in play order across ALL seasons (the VodPlayer autoplay
+     queue, so end-of-season -> next-season needs no special code). One-shot per control="RUN". -->
+<component name="ShowDetailTask" extends="Task">
+    <interface>
+        <field id="showUrl" type="string" />
+        <field id="showDetail" type="node" />
+        <field id="episodesFlat" type="array" />
+        <field id="showTitle" type="string" />
+        <field id="ok" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="ShowDetailTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Api.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Media.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Http.brs" />
+</component>

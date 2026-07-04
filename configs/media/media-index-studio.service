@@ -8,6 +8,9 @@ After=network-online.target
 Type=oneshot
 User=pi
 EnvironmentFile=-/opt/sally/media/sally-media.conf
+# TMDB creds (written by deploy-sally-api.sh from .env.tmdb). Optional (-) so the timer
+# still runs and enrichment degrades to frame-grab posters if it's absent.
+EnvironmentFile=-/opt/sally/sally-api.env
 Environment=SALLY_API_DIR=/opt/sally/sally-api
 ExecStart=/opt/sally/media/media-index-studio.py
 Nice=15

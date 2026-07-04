@@ -1,9 +1,10 @@
 # Map tile fetch — caching + throttle/error-handling followup
 
-**Status:** captured 2026-06-27, right after the ambient-map build (P1–P5). The map works; this
-doc is about **hardening the tile-fetch layer against a slow/throttling tile provider** and
-recording how the caching behaves. One fix (concurrent fetch) already landed this session; the
-rest is **proposed, not yet built**.
+**Status:** captured 2026-06-27, right after the ambient-map build (P1–P5), as a hardening
+follow-up for the tile-fetch layer against a slow/throttling tile provider. Concurrent fetch,
+the negative cache, the circuit breaker, and the W1–W5 mapping-interface work below all
+**shipped same-day 2026-06-27**. Only the "Other followups / watch-items" section at the bottom
+(disk-unmount detection, cache hygiene, the N100/PMTiles migration) remains open.
 
 Owner files: `services/sally-api/tiles.py` (fetch + cache + basemap), `services/sally-api/mapgen.py`
 (status strip), `services/sally-api/sallyconf.py` (config). Design context:

@@ -223,6 +223,7 @@ document.getElementById('f').onsubmit=function(e){e.preventDefault();
 
 # Cached readers for the trip store + OSRM route cache (mtime-checked per request).
 _movies = store.CachedJson(cfg.MOVIES_JSON, {"collections": [], "items": {}})
+_tv = store.CachedJson(cfg.TV_JSON, {"collections": [], "items": {}, "shows": {}})
 _trips = store.CachedJson(cfg.TRIPS_JSON, {"activeTripId": None, "trips": {}})
 _route = store.CachedJson(cfg.ROUTE_JSON, {})
 _fuel = store.CachedJson(cfg.FUEL_LOG_JSON, {"entries": []})
@@ -460,14 +461,18 @@ def _trip_stub(t):
 
 @app.route("/api/media")
 def api_media():
-    """type=trips -> home collections. type=movies -> studio library (Workstream A).
-    type=tv|kids -> reserved, still empty (tv lands in a later phase; kids is a per-item
-    kidSafe flag, not its own catalog)."""
+    """type=trips -> home collections. type=movies / type=tv -> studio library curated rows
+    (Workstream A). type=tv returns show cards that drill into /api/show/<id>. kids is a
+    per-item kidSafe flag, not its own catalog — any other type returns empty."""
     t = request.args.get("type", "trips")
     if t == "movies":
         m = _movies.get()
         return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "type": t,
                          "collections": m.get("collections", [])})
+    if t == "tv":
+        v = _tv.get()
+        return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "type": t,
+                         "collections": v.get("collections", [])})
     if t != "trips":
         return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "type": t, "collections": []})
     cat = _load_catalog()
@@ -491,6 +496,14 @@ def api_collection(cid):
             "schemaVersion": cfg.SCHEMA_VERSION, "id": cid, "kind": meta.get("kind"),
             "title": meta.get("title"), "items": movie_items,
         }))
+    tv_cat = _tv.get()
+    tv_items = tv_cat.get("items", {}).get(cid)   # tv-* category ids (namespaced, no collision)
+    if tv_items is not None:
+        meta = next((c for c in tv_cat.get("collections", []) if c.get("id") == cid), {})
+        return jsonify(_prune({
+            "schemaVersion": cfg.SCHEMA_VERSION, "id": cid, "kind": meta.get("kind"),
+            "title": meta.get("title"), "items": tv_items,
+        }))
     cat = _load_catalog()
     items = cat.get("items", {}).get(cid)
     if items is None:
@@ -513,6 +526,18 @@ def api_collection(cid):
     }))
 
 
+@app.route("/api/show/<sid>")
+def api_show(sid):
+    """Season/episode detail for one TV show (Workstream A). Additive endpoint — the show
+    cards from /api/collections/tv-* carry the detailUrl. 404 if unknown."""
+    d = _tv.get().get("shows", {}).get(sid)
+    if d is None:
+        abort(404)
+    out = dict(d)
+    out["schemaVersion"] = cfg.SCHEMA_VERSION
+    return jsonify(_prune(out))
+
+
 @app.route("/api/photos")
 def api_photos():
     cat = _load_catalog()
@@ -523,13 +548,14 @@ def api_photos():
     return jsonify({"schemaVersion": cfg.SCHEMA_VERSION, "photos": photos})
 
 
-_STUDIO_DIRS = {"movies", "tv"}
+_STUDIO_DIRS = {"movies", "tv", ".art"}
 
 
 def _safe_media_path(relpath):
     """Resolve relpath under MEDIA_ROOT (trips/drone/unsorted, unchanged) or STUDIO_ROOT
-    (movies/tv), rejecting traversal. Two roots, not one broadened root, specifically so
-    broadening studio coverage can never shift where an existing Trips URL resolves."""
+    (movies/tv, plus the .art poster cache), rejecting traversal. Two roots, not one
+    broadened root, specifically so broadening studio coverage can never shift where an
+    existing Trips URL resolves."""
     top = relpath.split("/", 1)[0]
     base = cfg.STUDIO_ROOT if top in _STUDIO_DIRS else cfg.MEDIA_ROOT
     root = os.path.realpath(base)

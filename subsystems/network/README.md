@@ -22,7 +22,7 @@ References:
 
 ## Roadmap
 
-1. **WiFi-as-WAN auto-switch at home** — Pi script that detects home SSID and SSHes into QX210 to flip the WAN profile. UCI keys to investigate: `network.wwan`, `wireless.wifi-iface[*]`.
+1. **WiFi-as-WAN auto-switch at home** — Pi script that detects home SSID and drives the QX210's LuCI HTTP API (same login → `sysauth` cookie → JSON pattern as `lte-monitoring.md`) to flip the WAN profile, or enables dropbear via LuCI first if SSH/UCI is preferred. UCI keys to investigate: `network.wwan`, `wireless.wifi-iface[*]`.
 2. **Captive portal helper** — small Pi script that watches for blocked traffic, MAC-clones a phone that successfully logged in (since the router doesn't ship a portal helper).
 3. **Document existing UCI config** — pull current `/etc/config/network` + `/etc/config/wireless` from the router into `configs/network/` as a baseline.
 4. **WiFi coverage extension for boat / campfire / adjacent sites** — Sally's audio system uses Snapcast over WiFi for the boat scenario (see `subsystems/audio/bt-pairing.md`). The QX210's stock WiFi typically reaches ~50–80 ft. **Confirmed: the QX210 has external antennas for both WiFi and cellular** — they're field-swappable, which makes the antenna upgrade the cheap path.
@@ -51,5 +51,5 @@ References:
 ## Next action
 
 Two things, in either order:
-1. SSH into the QX210 from the Pi, capture the current UCI config (`uci export`) into `configs/network/uci-baseline.txt`, and confirm the LEDE/OpenWrt version + which UCI options are actually present on this firmware.
+1. Enable dropbear via LuCI (Services → or Network → SSH Access), then SSH in and capture the current UCI config (`uci export`) into `configs/network/uci-baseline.txt` — confirming the LEDE/OpenWrt version + which UCI options are actually present on this firmware. (Or pull the same config through the LuCI HTTP API if leaving SSH disabled.)
 2. **Identify the QX210's WiFi antenna connector type** (SMA-male vs RP-SMA-male — photograph one stock antenna, check pin vs hole on the male end) **and confirm WiFi band(s)** (2.4-only vs dual-band 2.4+5 GHz). Once both are known, order 2× dual-band (or 2.4-only) 6 dBi omnis with the matching connector ($30–60 total) and swap. This single change is expected to bring boat / campfire / adjacent-site coverage into Snapcast range without any further hardware.

@@ -55,7 +55,7 @@ References:
 
 TODO:
 - Confirm the booster's power source (12V house, AC inverter, or shore-only) and document
-- Note whether the booster auto-shuts on oscillation and how to reset
+- Auto-shutdown on oscillation is confirmed (see mounting note above) — still need the reset procedure
 
 ## Roadmap
 

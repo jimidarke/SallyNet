@@ -33,3 +33,9 @@ P0 shell ✅ → **P1 Media ✅** (RowList rows-as-trips, `VodPlayer` MP4 + tric
 P2 Camp/Systems (sensors via MQTT) → P3 Cameras (go2rtc) → P4 audio status →
 **P5 Photos ✅** (slideshow + guest-upload QR; built alongside P1) → P6 router → P7 propane/AC.
 New media files: `source/Media.brs`, `components/tasks/MediaListTask`, `components/screens/{MediaScreen,VodPlayer,PhotoGallery,QrScreen}`, `components/widgets/MediaCard`.
+
+**Workstream A — Studio library + Netflix-style nav (v0.7.0, coded + deployed 2026-07-04):** `MediaScreen` reworked into a **Trips / Movies / TV Shows tab strip**; new
+`TripsScreen` (Trips pulled out to its own Home tile), `EpisodesScreen` + `ShowDetailTask`
+(season/episode drill-in, per-episode resume + `VodPlayer` autoplay-next), `StudioListTask`
+(sibling of `MediaListTask`, shares extracted `source/Http.brs`). Backend: `GET
+/api/media?type=movies|tv` + `GET /api/show/<id>` in `api-contract.md`.

@@ -15,7 +15,7 @@
         <Rectangle translation="[0, 120]" width="1920" height="5" color="0xC8462EFF" />
         <Rectangle translation="[0, 125]" width="1920" height="5" color="0xE8702EFF" />
         <Label translation="[60, 36]" color="0x2B2A26FF" font="font:LargeBoldSystemFont"
-               text="Send Us Your Photos" />
+               text="Send Us Your Photos &amp; Videos" />
 
         <!-- white quiet-zone card + QR -->
         <Rectangle translation="[680, 300]" width="560" height="560" color="0xFFFFFFFF" />

@@ -6,7 +6,7 @@
 ## Why
 
 The "single unified experience" goal still has a gap: no way to jump to the big streaming apps
-from the Home hub. `mastertodo.md` and `subsystems/media/README.md` roadmap #5 both call for
+from the Home hub. `mastertodo.md` and `subsystems/media/README.md` roadmap #6 both call for
 Netflix / YouTube tiles on Home.
 
 ## The finding that reshapes the original idea
@@ -89,7 +89,7 @@ App IDs: **Netflix = 12**, **YouTube = 837**.
 ### Docs
 - **`api-contract.md`**: add `/api/launch | POST | new | {ok, reason?}` to the endpoint table + a
   short "Launch (command)" note (additive per its versioning policy).
-- **`subsystems/media/README.md`**: roadmap #5 → approach/done; update "Next action".
+- **`subsystems/media/README.md`**: roadmap #6 → approach/done; update "Next action".
 - **`mastertodo.md`**: rewrite the Netflix/YouTube line to the orchestrator approach (done).
 - **`roku-channel/CLAUDE.md`**: note the new files + that external-app launch goes via `sally-api`,
   never in-channel ECP.

@@ -21,6 +21,8 @@
         <CampScreen id="camp" visible="false" />
         <MapScreen id="map" visible="false" />
         <MediaScreen id="media" visible="false" />
+        <TripsScreen id="trips" visible="false" />
+        <EpisodesScreen id="episodes" visible="false" />
         <VodPlayer id="vod" visible="false" />
         <PhotoGallery id="photos" visible="false" />
         <QrScreen id="qr" visible="false" />

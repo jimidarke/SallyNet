@@ -6,7 +6,7 @@ sub init()
     defs = [
         { label: "Drive",   route: "drive",   enabled: true },
         { label: "Media",   route: "media",   enabled: true },
-        { label: "Photos",  route: "photos",  enabled: true },
+        { label: "Trips",   route: "trips",   enabled: true },
         { label: "Camp",    route: "camp",    enabled: true },
         { label: "Map",     route: "map",     enabled: true },
         { label: "Systems", route: "systems", enabled: false }

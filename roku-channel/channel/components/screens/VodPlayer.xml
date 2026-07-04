@@ -13,6 +13,10 @@
     <interface>
         <field id="item" type="assocarray" onChange="onItem" />
         <field id="active" type="boolean" value="false" onChange="onActive" />
+        <!-- Autoplay-next queue (TV episodes in play order). Movies/Trips pass a 1-item
+             queue, so hasNext() is false and autoplay is an inert no-op. -->
+        <field id="queue" type="array" />
+        <field id="queueIndex" type="integer" value="0" />
         <field id="requestBack" type="boolean" value="false" alwaysNotify="true" />
     </interface>
     <script type="text/brightscript" uri="VodPlayer.brs" />

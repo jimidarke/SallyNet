@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- TripsScreen — guest-uploaded photos & videos. One RowList row per trip collection,
+     the row's items being that trip's videos AND photos (Netflix layout: horizontal within
+     a trip, vertical between trips). Selecting a video plays it in VodPlayer; selecting a
+     photo opens the PhotoGallery slideshow. Fed by MainScene via videoCatalog (built by
+     MediaListTask from /api/media?type=trips + /api/collections). Reached from the Home
+     "Trips" tile; the upload QR is on Home (press ★). -->
+<component name="TripsScreen" extends="Group" initialFocus="rows">
+    <interface>
+        <field id="videoCatalog" type="node" onChange="onCatalog" />
+        <field id="selectedItem" type="assocarray" alwaysNotify="true" />
+        <field id="openPhotos" type="boolean" alwaysNotify="true" />
+        <field id="visible" type="boolean" onChange="onVisibleChange" />
+    </interface>
+    <script type="text/brightscript" uri="TripsScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Media.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8DCC8FF" />
+
+        <!-- header band + twin stripe + title + clock (matches HomeHub/MediaScreen) -->
+        <Rectangle width="1920" height="120" color="0xE8A044FF" />
+        <Rectangle translation="[0, 120]" width="1920" height="5" color="0xC8462EFF" />
+        <Rectangle translation="[0, 125]" width="1920" height="5" color="0xE8702EFF" />
+        <Label translation="[60, 36]" color="0x2B2A26FF" font="font:LargeBoldSystemFont" text="Trips" />
+        <Label id="clock" translation="[1500, 44]" width="360" horizAlign="right"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+
+        <RowList id="rows" translation="[60, 200]"
+                 itemComponentName="MediaCard"
+                 numRows="2"
+                 rowItemSize="[[300, 224]]"
+                 rowHeights="[260]"
+                 rowItemSpacing="[[20, 0]]"
+                 itemSize="[1800, 524]"
+                 rowLabelOffset="[[0, 8]]"
+                 showRowLabel="[true]"
+                 rowTitleComponentName=""
+                 focusBitmapBlendColor="0x00000000"
+                 drawFocusFeedback="false"
+                 vertFocusAnimationStyle="floatingFocus"
+                 rowFocusAnimationStyle="fixedFocusWrap" />
+
+        <!-- empty state -->
+        <Label id="empty" translation="[0, 480]" width="1920" horizAlign="center"
+               color="0x2B2A26AA" font="font:LargeBoldSystemFont"
+               text="No trips yet — press the &#9733; button on the Home screen to send photos &amp; videos!" visible="false" />
+
+        <!-- focused-item detail strip -->
+        <Label id="detail" translation="[60, 980]" width="1800" height="60"
+               color="0x2B2A26FF" font="font:MediumSystemFont" text="" />
+    </children>
+</component>

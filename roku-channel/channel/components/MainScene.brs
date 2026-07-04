@@ -7,6 +7,8 @@ sub init()
     m.camp = m.top.findNode("camp")
     m.map = m.top.findNode("map")
     m.media = m.top.findNode("media")
+    m.trips = m.top.findNode("trips")
+    m.episodes = m.top.findNode("episodes")
     m.vod = m.top.findNode("vod")
     m.photos = m.top.findNode("photos")
     m.qr = m.top.findNode("qr")
@@ -19,6 +21,7 @@ sub init()
     m.splashTimer = m.top.findNode("splashTimer")
     m.toastTimer = m.top.findNode("toastTimer")
     m.qrParent = "photos"
+    m.vodParent = "media"
 
     m.route = "splash"
     m.haveState = false
@@ -36,6 +39,10 @@ sub init()
 
     ' media wiring
     m.media.observeField("selectedItem", "onMediaSelect")
+    m.media.observeField("selectedShow", "onShowSelect")
+    m.episodes.observeField("selectedEpisode", "onEpisodeSelect")
+    m.trips.observeField("selectedItem", "onTripsSelect")
+    m.trips.observeField("openPhotos", "onTripsPhotos")
     m.vod.observeField("requestBack", "onChildBack")
     m.photos.observeField("requestBack", "onChildBack")
     m.photos.observeField("requestQr", "onPhotosQr")
@@ -44,6 +51,7 @@ sub init()
     m.list.observeField("photoCatalog", "onPhotoCatalog")
     m.list.control = "RUN"
     m.studioList.observeField("movieCatalog", "onMovieCatalog")
+    m.studioList.observeField("tvCatalog", "onStudioTvCatalog")
     m.studioList.control = "RUN"
 
     ' Fast-paint from cached state.
@@ -164,6 +172,8 @@ sub applyRoute(route as string)
     m.camp.visible = (route = "camp")
     m.map.visible = (route = "map")
     m.media.visible = (route = "media")
+    m.trips.visible = (route = "trips")
+    m.episodes.visible = (route = "episodes")
     m.vod.visible = (route = "vod")
     m.photos.visible = (route = "photos")
     m.qr.visible = (route = "qr")
@@ -179,6 +189,10 @@ sub applyRoute(route as string)
         m.map.setFocus(true)
     else if route = "media" then
         m.media.setFocus(true)
+    else if route = "trips" then
+        m.trips.setFocus(true)
+    else if route = "episodes" then
+        m.episodes.setFocus(true)
     else if route = "photos" then
         m.photos.setFocus(true)
     else if route = "qr" then
@@ -189,11 +203,14 @@ sub applyRoute(route as string)
     slEvent("route", { to: route })
 end sub
 
-' Back climbs the route stack: vod->media->home, photos->home, qr->photos.
+' Back climbs the route stack: vod->(media|trips via m.vodParent), media->home,
+' trips->home, photos->trips, qr->m.qrParent.
 function routeParent(route as string) as string
-    if route = "vod" then return "media"
+    if route = "vod" then return m.vodParent
     if route = "media" then return "home"
-    if route = "photos" then return "home"
+    if route = "trips" then return "home"
+    if route = "episodes" then return "media"
+    if route = "photos" then return "trips"
     if route = "qr" then return m.qrParent
     if route = "drive" then return "home"
     if route = "camp" then return "home"
@@ -215,12 +232,11 @@ sub onHomeSelect()
     else if r = "map" then
         go("map")
     else if r = "media" then
-        m.list.control = "RUN"
         m.studioList.control = "RUN"
         go("media")
-    else if r = "photos" then
+    else if r = "trips" then
         m.list.control = "RUN"
-        go("photos")
+        go("trips")
     else
         showToast(r + " - coming soon")
     end if
@@ -229,8 +245,50 @@ end sub
 sub onMediaSelect()
     it = m.media.selectedItem
     if it = invalid then return
+    m.vodParent = "media"
+    m.vod.queue = [it]      ' single-item queue -> autoplay-next is a no-op for movies
+    m.vod.queueIndex = 0
     m.vod.item = it
     go("vod")
+end sub
+
+sub onTripsSelect()
+    it = m.trips.selectedItem
+    if it = invalid then return
+    m.vodParent = "trips"
+    m.vod.queue = [it]
+    m.vod.queueIndex = 0
+    m.vod.item = it
+    go("vod")
+end sub
+
+' TV: a show card drills into EpisodesScreen (which fetches /api/show/<id>).
+sub onShowSelect()
+    s = m.media.selectedShow
+    if s = invalid then return
+    m.episodes.show = s
+    go("episodes")
+end sub
+
+' An episode selection carries the whole show as a play queue; load it into VodPlayer so
+' autoplay-next advances through the season(s).
+sub onEpisodeSelect()
+    sel = m.episodes.selectedEpisode
+    if sel = invalid or sel.queue = invalid then return
+    m.vodParent = "episodes"
+    m.vod.queue = sel.queue
+    m.vod.queueIndex = sel.index
+    m.vod.item = sel.queue[sel.index]
+    go("vod")
+end sub
+
+sub onStudioTvCatalog()
+    m.media.tvCatalog = m.studioList.tvCatalog
+end sub
+
+sub onTripsPhotos()
+    if m.trips.openPhotos <> true then return
+    go("photos")
 end sub
 
 sub onPhotosQr()
@@ -245,7 +303,7 @@ sub onChildBack()
 end sub
 
 sub onVideoCatalog()
-    m.media.videoCatalog = m.list.videoCatalog
+    m.trips.videoCatalog = m.list.videoCatalog
 end sub
 
 sub onMovieCatalog()
@@ -262,6 +320,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if m.route = "home" or m.route = "splash" then return false
         go(routeParent(m.route))
         return true
+    else if key = "options" then
+        ' Star (*) on Home surfaces the guest-upload QR without diving into Trips (C1).
+        if m.route = "home" then
+            m.qrParent = "home"
+            m.qr.refresh = true
+            go("qr")
+            return true
+        end if
     end if
     return false
 end function

@@ -76,11 +76,16 @@ sub onPlayerState()
         m.retry = 0
         hideReconnect()
     else if st = "finished" then
-        ' Normal EOF for VOD — clear the bookmark and return to browse.
+        ' Normal EOF for VOD — clear this item's bookmark, then autoplay the next queued
+        ' episode if there is one, else return to browse.
         clearBookmark(currentId())
-        m.bookmarkTimer.control = "stop"
-        slEvent("vod_finished", { id: currentId() })
-        m.top.requestBack = true
+        if hasNext() then
+            advanceToNext()
+        else
+            m.bookmarkTimer.control = "stop"
+            slEvent("vod_finished", { id: currentId() })
+            m.top.requestBack = true
+        end if
     else if st = "error" then
         info = m.player.errorInfo
         cat = ""
@@ -115,6 +120,27 @@ end sub
 
 sub onBackoffElapsed()
     startPlayback()
+end sub
+
+' --- autoplay-next (TV episode queue) ---------------------------------------
+function hasNext() as boolean
+    q = m.top.queue
+    if q = invalid then return false
+    return (m.top.queueIndex + 1) < q.count()
+end function
+
+sub advanceToNext()
+    ' Back / leaving the player cancels a pending advance.
+    if not m.top.active then return
+    ' Free the single H.264 decoder before reloading: stop the SAME Video node (never a
+    ' second), and mark the stop intentional so onPlayerState ignores it. Setting item then
+    ' fires onItem -> startPlayback, which re-keys the resume bookmark to the next episode.
+    m.stopping = true
+    m.player.control = "stop"
+    m.top.queueIndex = m.top.queueIndex + 1
+    nxt = m.top.queue[m.top.queueIndex]
+    slEvent("vod_autonext", { to: nxt.contentid })
+    m.top.item = nxt
 end sub
 
 sub scheduleReconnect(reason as string)

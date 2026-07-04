@@ -1,0 +1,7 @@
+{
+  "_README": "Hand corrections for the studio library, layered OVER TMDB (override wins). Keyed by item id = slug(title)-year, e.g. 'cars-2006' (movies), 'bluey-2018' / 'bluey-2018-s01e03' (TV). movies.<id>: MATCH fixes {tmdbId,title,year} applied at fetch (fix a bad/failed match), and PRESENTATION {genres,kidSafe,poster} applied at build (force a row/badge/art with no network). shows.<id> / episodes.<id> mirror for TV. Deploy-installed only if absent (never clobbers Pi edits); after editing on the Pi run scripts/media-fetch-art.py.",
+  "schemaVersion": 1,
+  "movies": {},
+  "shows": {},
+  "episodes": {}
+}

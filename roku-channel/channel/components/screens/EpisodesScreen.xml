@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- EpisodesScreen — one TV show's seasons + episodes (rows-as-seasons RowList of episode
+     cards; absent/pending episodes simply aren't present). No Video node here, so there is
+     no single-decoder concern. Selecting an episode publishes selectedEpisode {queue, index};
+     MainScene loads it into VodPlayer with the whole cross-season queue so autoplay-next
+     advances through the show. Back bubbles to MainScene (routeParent: episodes -> media). -->
+<component name="EpisodesScreen" extends="Group" initialFocus="epRows">
+    <interface>
+        <field id="show" type="assocarray" onChange="onShow" />
+        <field id="selectedEpisode" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <script type="text/brightscript" uri="EpisodesScreen.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Rectangle width="1920" height="1080" color="0xE8DCC8FF" />
+        <Rectangle width="1920" height="120" color="0xE8A044FF" />
+        <Rectangle translation="[0, 120]" width="1920" height="5" color="0xC8462EFF" />
+        <Rectangle translation="[0, 125]" width="1920" height="5" color="0xE8702EFF" />
+        <Label id="showTitle" translation="[60, 36]" width="1400" color="0x2B2A26FF"
+               font="font:LargeBoldSystemFont" text="" />
+        <Label id="clock" translation="[1500, 44]" width="360" horizAlign="right"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+
+        <RowList id="epRows" translation="[60, 200]"
+                 itemComponentName="MediaCard"
+                 numRows="2"
+                 rowItemSize="[[300, 224]]"
+                 rowHeights="[260]"
+                 rowItemSpacing="[[20, 0]]"
+                 itemSize="[1800, 524]"
+                 rowLabelOffset="[[0, 8]]"
+                 showRowLabel="[true]"
+                 rowTitleComponentName=""
+                 focusBitmapBlendColor="0x00000000"
+                 drawFocusFeedback="false"
+                 vertFocusAnimationStyle="floatingFocus"
+                 rowFocusAnimationStyle="fixedFocusWrap" />
+
+        <Label id="empty" translation="[0, 480]" width="1920" horizAlign="center"
+               color="0x2B2A26AA" font="font:LargeBoldSystemFont"
+               text="No episodes available yet." visible="false" />
+        <Label id="detail" translation="[60, 980]" width="1800" height="60"
+               color="0x2B2A26FF" font="font:MediumSystemFont" text="" />
+
+        <ShowDetailTask id="detailTask" />
+    </children>
+</component>
