@@ -82,6 +82,19 @@ sub onPlayerState()
         slEvent("vod_finished", { id: currentId() })
         m.top.requestBack = true
     else if st = "error" then
+        info = m.player.errorInfo
+        cat = ""
+        src = ""
+        http = ""
+        dbg = ""
+        if info <> invalid then
+            cat = asStr(info.category)
+            src = asStr(info.source)
+            http = asStr(info.httpStatus)
+            dbg = asStr(info.dbgmsg)
+        end if
+        slEvent("vod_error", { code: m.player.errorCode, msg: m.player.errorMsg,
+                                cat: cat, src: src, http: http, dbg: dbg })
         scheduleReconnect("error")
     else if st = "stopped" then
         ' Ignore our own intentional stops; an unexpected stop is treated as an error.

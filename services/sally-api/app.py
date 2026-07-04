@@ -578,7 +578,13 @@ def media_file(relpath):
 
     length = end - start + 1
 
-    def stream(path=full, start=start, length=length, chunk=262144):
+    # Smaller than waitress 1.2.0b2's 1 MiB outbuf_overflow threshold, by a wide margin —
+    # keeps less data in flight so a slow/seeking client is far less likely to trip
+    # waitress's disk-spool buffering, which has a known disconnect-time race (closes its
+    # spool file out from under a write already in flight: github.com/Pylons/waitress/
+    # issues/116). Mitigation, not a full fix — that needs a waitress upgrade, out of
+    # scope while this Pi stays on Buster.
+    def stream(path=full, start=start, length=length, chunk=65536):
         with open(path, "rb") as f:
             f.seek(start)
             remaining = length
