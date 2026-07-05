@@ -80,6 +80,13 @@ sections that are simply absent until their phase lands.
     "last": { "date": "...", "odo_km": 142400.0, "litres": 88.0, "total": 136.4, "l_100km": 22.0 },
     "avg_l_100km": 21.4, "fills": 7
   },
+  "weather": {                             // present once weather-refresh.py has cached (C0); additive
+    "temp_c": 20, "condition": "Chance of showers", "icon": "39",  // icon = EC iconCode -> pkg:/images/wx/<icon>.png
+    "high_c": 23, "low_c": 12,
+    "summary": "A mix of sun and cloud. 30 percent chance of showers this afternoon.",
+    "location": "Edmonton", "observed_hm": "16:00",   // nearest EC site name + its local obs time
+    "stale": false                         // true once the cache is older than WEATHER_STALE_S (3 h)
+  },
   "alerts": [],                            // [{ kind, sev, text, ts }] — e.g. {kind:"gps_lost",sev:"warn"} on signal loss
   "system": { "host": "campingpi", "uptime_s": 0, "throttled": "0x0" }
   // --- omitted until populated (never sent as null) ---
@@ -109,6 +116,15 @@ sections that are simply absent until their phase lands.
   cached route, leaving `km_to_dest` (straight-line) as the offline fallback.
 - `fuel` is derived from `/var/lib/sally/fuel-log.json`; `l_100km` is per-tank (litres ÷ odometer
   delta to the previous fill), `avg_l_100km` is the running mean over fills that have one.
+- `weather` is Environment Canada current conditions for the **nearest EC site to the live GPS
+  position** (else frozen last-known, else the Edmonton home anchor), cached to
+  `/var/lib/sally/weather.json` out-of-band by `scripts/weather-refresh.py` (~15 min timer, one LTE
+  call) and folded in read-only — so the poll stays fast and the card survives cellular dead zones on
+  the last-good cache. `temp_c`/`high_c`/`low_c` are rounded °C; `icon` is the EC iconCode string
+  (`"00".."48"`) the Roku maps to `pkg:/images/wx/<icon>.png`; `condition`/`icon` fall back to the
+  current forecast period when EC leaves the observed values blank; `summary` is the current period's
+  forecast text. `stale` is set once the cache exceeds `WEATHER_STALE_S` (default 3 h). Additive — no
+  `schemaVersion` bump (the Roku ignores it on older builds). Distinct from `env` (onboard sensors).
 - `system.throttled` is `vcgencmd get_throttled` — the under‑voltage canary surfaced on the
   Systems screen.
 - Sensor blocks (`power`/`tanks`/`env`/`level`/`systems`/`cameras`/`audio`) are **omitted** until

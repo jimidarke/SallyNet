@@ -226,6 +226,7 @@ _movies = store.CachedJson(cfg.MOVIES_JSON, {"collections": [], "items": {}})
 _tv = store.CachedJson(cfg.TV_JSON, {"collections": [], "items": {}, "shows": {}})
 _trips = store.CachedJson(cfg.TRIPS_JSON, {"activeTripId": None, "trips": {}})
 _route = store.CachedJson(cfg.ROUTE_JSON, {})
+_weather = store.CachedJson(cfg.WEATHER_JSON, {})   # EC current conditions (scripts/weather-refresh.py)
 _fuel = store.CachedJson(cfg.FUEL_LOG_JSON, {"entries": []})
 _waypoints = store.CachedJson(cfg.WAYPOINTS_JSON, {"waypoints": []})
 _wproute = store.CachedJson(cfg.WAYPOINT_ROUTE_JSON, {})
@@ -420,6 +421,27 @@ def _fuel_state():
         "avg_l_100km": avg,
         "fills": len(entries),
     }
+
+
+def _weather_state():
+    """Project the Environment Canada weather cache (scripts/weather-refresh.py) into the /api/state
+    `weather` block: current temp, condition + EC iconCode, today's high/low, a brief statement, the
+    nearest-site name and local observation time. None when there's no cache yet (pruned out). `stale`
+    flags a cache older than WEATHER_STALE_S so the Roku can mark dead-zone / last-good data."""
+    w = _weather.get() or {}
+    if w.get("temp_c") is None:
+        return None
+    return _prune({
+        "temp_c": w.get("temp_c"),
+        "condition": w.get("condition"),
+        "icon": w.get("icon"),               # EC iconCode string "00".."49" -> pkg:/images/wx/<icon>.png
+        "high_c": w.get("high_c"),
+        "low_c": w.get("low_c"),
+        "summary": w.get("summary"),
+        "location": w.get("location"),
+        "observed_hm": w.get("observed_hm"),
+        "stale": (int(time.time()) - int(w.get("fetched_ts", 0))) > cfg.WEATHER_STALE_S,
+    })
 
 
 # =============================================================================
@@ -1374,6 +1396,7 @@ def api_state():
         "nav": {"secondsSinceFix": age, "hadFix": had},
         "trip": trip_section,   # omitted (pruned) when no active trip
         "fuel": _fuel_state(),  # omitted (pruned) when no fill-ups logged
+        "weather": _weather_state(),  # omitted (pruned) until weather-refresh.py has written a cache
         "drive": {
             "odo_km": None,
             "trip_km": None,

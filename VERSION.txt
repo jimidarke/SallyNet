@@ -1,6 +1,16 @@
-0.7.0
+0.8.0
 
 ## Changelog
+
+### 0.8.0 (2026-07-04)
+- **Weather tile (C0 quick win) — Environment Canada current conditions on the Home hub.** New
+  `scripts/weather-refresh.py` worker (+ `ec_weather.py`, `ec_sites.csv` nearest-site table) fetches
+  EC citypage XML for the nearest site to the live GPS fix (else the Edmonton home anchor), caches
+  to `/var/lib/sally/weather.json`, and folds into `/api/state.weather` (temp/condition/EC iconCode/
+  high-low/summary/location/observed time, `stale` past `WEATHER_STALE_S` = 3 h). Additive to the
+  frozen `/api` contract — no `schemaVersion` bump. Roku: new `WeatherCard` widget wired into
+  `HomeHub` (top-right, hidden until a cache exists). `weather.{service,timer}` (15 min cadence)
+  added to `deploy-media-worker.sh`'s unit rollout. **Not yet deployed to hardware.**
 
 ### 0.7.0 (2026-07-04)
 - **Roku Netflix-style navigation + media overhaul — all additive to the frozen `/api` contract (no `schemaVersion`/`SN_CACHE_VER` bump; 178 backend tests + `bsc` lint green). Deployed to hardware 2026-07-04** (sally-api + media pipeline to campingpi, channel sideloaded to Camperoku).

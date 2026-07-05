@@ -24,6 +24,7 @@ sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/trip-eta-refresh.py" "$REPO/scripts/waypoint-eta-refresh.py" \
   "$REPO/scripts/poi-refresh.py" "$REPO/scripts/map-preseed.py" "$REPO/scripts/nav-tick.py" \
   "$REPO/scripts/media-index-studio.py" "$REPO/scripts/media-fetch-art.py" \
+  "$REPO/scripts/weather-refresh.py" \
   "$PI_USER@$PI_HOST:/opt/sally/media/"
 sshpass -e rsync -az -e "ssh ${SSH_OPTS[*]}" \
   "$REPO/scripts/lib/" "$PI_USER@$PI_HOST:/opt/sally/media/lib/"
@@ -50,9 +51,10 @@ done
 # Cadence refreshers (telemetry unit dir) — short timers that no-op cheaply when idle:
 #   trip-eta (active-trip ETA), waypoint-eta (next-waypoint road-km + arrival auto-advance),
 #   poi-refresh (Overpass POI snapshot as Sally moves). All feed the ambient map.
+#   weather (Environment Canada current conditions -> weather.json, folded into /api/state).
 # nav-tick.service is a Type=simple DAEMON (not a timer) — the GPS liveness heartbeat.
 for u in trip-eta.service trip-eta.timer waypoint-eta.service waypoint-eta.timer \
-         poi-refresh.service poi-refresh.timer nav-tick.service; do
+         poi-refresh.service poi-refresh.timer weather.service weather.timer nav-tick.service; do
   sshpass -e scp "${SSH_OPTS[@]}" "$REPO/configs/telemetry/$u" "$PI_USER@$PI_HOST:/tmp/$u"
   sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" "sudo mv /tmp/$u /etc/systemd/system/$u"
 done
@@ -60,9 +62,9 @@ sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \
   "sudo systemctl daemon-reload \
    && sudo systemctl enable --now media-track-logger.service \
    && sudo systemctl enable --now media-encode.timer media-index-studio.timer \
-   && sudo systemctl enable --now trip-eta.timer waypoint-eta.timer poi-refresh.timer \
+   && sudo systemctl enable --now trip-eta.timer waypoint-eta.timer poi-refresh.timer weather.timer \
    && sudo systemctl enable --now nav-tick.service \
-   && sleep 1 && systemctl is-active media-track-logger.service nav-tick.service && systemctl list-timers media-encode.timer media-index-studio.timer trip-eta.timer waypoint-eta.timer poi-refresh.timer --no-pager | head -7"
+   && sleep 1 && systemctl is-active media-track-logger.service nav-tick.service && systemctl list-timers media-encode.timer media-index-studio.timer trip-eta.timer waypoint-eta.timer poi-refresh.timer weather.timer --no-pager | head -8"
 
 header "ensuring media tree exists"
 sshpass -e ssh "${SSH_OPTS[@]}" "$PI_USER@$PI_HOST" \

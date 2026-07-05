@@ -86,6 +86,14 @@ GEO_USER_AGENT = os.environ.get("GEO_USER_AGENT", "sally-api/1.0 (sallynet motor
 # ETA from route.json older than this many seconds is reported as stale to the Roku.
 ROUTE_STALE_S = int(os.environ.get("ROUTE_STALE_S", "600"))
 
+# --- weather (C0 quick win) --------------------------------------------------
+# Environment Canada current-conditions cache written by scripts/weather-refresh.py (nearest EC
+# site to the live GPS position, else the Edmonton home anchor). /api/state folds it into the
+# `weather` block; a cache older than WEATHER_STALE_S is flagged stale so the Roku can mark
+# dead-zone / last-good data. Lives on the SD (small, atomic), like the other read-models.
+WEATHER_JSON = os.environ.get("WEATHER_JSON", "/var/lib/sally/weather.json")
+WEATHER_STALE_S = int(os.environ.get("WEATHER_STALE_S", "10800"))  # 3 h
+
 # Guest upload form + QR. LAN_BASE_URL is what the QR encodes (guests scan it on
 # SallyNet WiFi); keep it the LAN IP — mDNS .local is flaky on Android and guests may be
 # on cellular. UPLOAD_MAX_BYTES caps a single request (phone video is large).

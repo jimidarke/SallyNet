@@ -1,0 +1,15 @@
+[Unit]
+Description=SallyNet weather refresher (Environment Canada current conditions -> weather.json cache)
+After=network-online.target sally-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+# The nearest-EC-site + XML parse logic is imported from the deployed sally-api (ec_weather), and the
+# ec_sites.csv site table ships alongside it. Override endpoints/paths here if relocated (N100):
+# Environment=SALLY_API_DIR=/opt/sally/sally-api WEATHER_SITE_LIST=/opt/sally/sally-api/ec_sites.csv
+# Environment=EC_BASE=https://dd.weather.gc.ca/today/citypage_weather
+ExecStart=/usr/bin/python3 /opt/sally/media/weather-refresh.py
+# Gentle — one directory listing + one XML GET over LTE; never compete with gpsd/sally-api.
+Nice=10

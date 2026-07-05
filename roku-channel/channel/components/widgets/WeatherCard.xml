@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- WeatherCard — Home hub current-conditions card. Renders /api/state.weather (Environment Canada,
+     produced by the Pi's scripts/weather-refresh.py). Light "hub" card: cream panel, ink text, a twin
+     red/orange top stripe (the masthead + NavTile vocabulary). Display-only, NOT focusable — the D-pad
+     still moves along the nav-tile row. Hides itself when there's no weather cache yet; dims and tags
+     "stale" for dead-zone / last-good data. The icon is a local pkg: glyph keyed by EC iconCode, so a
+     missing/empty code just shows no glyph (never a broken image) and the temp/text still render. -->
+<component name="WeatherCard" extends="Group">
+    <interface>
+        <field id="weather" type="assocarray" onChange="onWeather" />
+    </interface>
+    <script type="text/brightscript" uri="WeatherCard.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Config.brs" />
+    <children>
+        <Rectangle id="panel" width="1160" height="410" color="0xFFF8E1FF" />
+        <Rectangle translation="[0, 0]" width="1160" height="4" color="0xC8462EFF" />
+        <Rectangle translation="[0, 4]" width="1160" height="4" color="0xE8702EFF" />
+
+        <!-- weather glyph (EC icon 00..48) -->
+        <Poster id="icon" translation="[50, 74]" width="180" height="150"
+                loadDisplayMode="scaleToFit" uri="pkg:/images/transparent.png" />
+
+        <!-- temp + condition + hi/lo -->
+        <Label id="temp" translation="[256, 58]" width="500" height="84"
+               color="0x2B2A26FF" font="font:LargeBoldSystemFont" text="" />
+        <Label id="condition" translation="[260, 150]" width="850" height="44"
+               color="0x2B2A26FF" font="font:MediumBoldSystemFont" text="" />
+        <Label id="hilo" translation="[260, 198]" width="500" height="40"
+               color="0x2B2A26AA" font="font:MediumSystemFont" text="" />
+
+        <!-- brief statement -->
+        <Label id="summary" translation="[50, 264]" width="1070" height="96"
+               wrap="true" maxLines="3" color="0x2B2A26FF" font="font:MediumSystemFont" text="" />
+
+        <!-- footer: location · updated · stale -->
+        <Label id="footer" translation="[50, 368]" width="1070" height="34"
+               color="0x2B2A26AA" font="font:SmallSystemFont" text="" />
+    </children>
+</component>

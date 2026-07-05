@@ -1,6 +1,7 @@
 sub init()
     m.tilesGroup = m.top.findNode("tiles")
     m.ribbon = m.top.findNode("ribbon")
+    m.weather = m.top.findNode("weather")
     m.tiles = []
 
     defs = [
@@ -60,6 +61,15 @@ end function
 sub onState()
     s = m.top.state
     if s = invalid then return
+
+    ' Weather card (top-right): push the EC block through, or hide it when absent (dead zone with
+    ' no cache yet). /api/state omits `weather` until weather-refresh.py has written a cache.
+    if s.weather <> invalid then
+        m.weather.weather = s.weather
+    else
+        m.weather.visible = false
+    end if
+
     parts = []
     gps = s.gps
     if gps <> invalid then

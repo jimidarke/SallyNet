@@ -1,0 +1,17 @@
+Weather icons + current-conditions data: Environment and Climate Change Canada
+================================================================================
+
+The weather glyphs in this directory (00.png .. 48.png) are the official Environment
+Canada City Page Weather icons (https://weather.gc.ca/weathericons/<NN>.gif), converted
+from GIF to 2x PNG for the SallyNet Roku channel. They are keyed by the EC `iconCode`
+(00..49) returned in the citypage XML and served to the Roku via /api/state.weather.icon.
+
+The icons and the underlying weather data are provided by the Meteorological Service of
+Canada under the Open Government Licence - Canada:
+  https://open.canada.ca/en/open-government-licence-canada
+
+Attribution (as required by the licence):
+  "Contains information licensed under the Open Government Licence - Canada."
+  Weather data and icons (C) Environment and Climate Change Canada.
+
+Source datamart: https://dd.weather.gc.ca/today/citypage_weather/

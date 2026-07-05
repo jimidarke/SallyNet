@@ -23,6 +23,10 @@
         <Poster uri="pkg:/images/mascot.png" width="520" height="287"
                 translation="[60, 240]" loadDisplayMode="scaleToFit" />
 
+        <!-- weather card — fills the empty top-right, right of the mascot + above the tiles.
+             Display-only; populated from state.weather in onState(). -->
+        <WeatherCard id="weather" translation="[660, 190]" />
+
         <!-- nav tiles -->
         <LayoutGroup id="tiles" layoutDirection="horiz" itemSpacings="[28]"
                      translation="[60, 640]" />

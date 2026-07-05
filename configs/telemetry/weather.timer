@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh the SallyNet weather every 15 min
+
+[Timer]
+# Fire 120s after boot (let sally-api + gpsd settle), then every 15 min. EC refreshes its citypage
+# data hourly; 15 min keeps the nearest site current as Sally drives while staying gentle on LTE.
+# Unlike the ETA timers this makes an outbound call every run, so don't tighten the cadence.
+OnBootSec=120
+OnUnitActiveSec=900
+AccuracySec=60s
+
+[Install]
+WantedBy=timers.target

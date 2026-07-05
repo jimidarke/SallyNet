@@ -125,9 +125,18 @@ execute as a batch once the plan is settled.
 ## C. New ideas (2026-06-26 brain dump)
 
 ### C0 — Quick wins (small; do alongside A)
+- [ ] **Wire phone-shared upload GPS into geotagging (or drop it)** — `POST /api/upload`
+  captures the browser's `lat`/`lon` (guest checks "Attach my phone's location" on `/upload`)
+  into `upload.json`, but `media-ingest.sh`'s `process_batch` only reads `trip`/`tripTitle`/
+  `uploader` from that manifest — the phone GPS is never passed to `media-extract-meta.py`'s
+  `--set`. Today only embedded EXIF GPS and GPX-track correlation actually geotag items
+  (`media-extract-meta.py`'s locked fallback chain: embedded -> track -> omit); the
+  phone-shared coordinate is dead data. Decide: wire it in as a lowest-priority fallback
+  (after embedded, after track correlation) for photos with no GPS at all, or remove the
+  checkbox if it's redundant with EXIF on virtually all phone photos.
 - [ ] **Speed deadband** — round speeds below ~1 km/h to 0 so GPS jitter (e.g. 0.3 km/h while parked) never reads as moving or flips mode. Apply in `sally-api` gps normalize (`gpsd_client`/`_derive_mode`) and/or Roku display.
 - [ ] **Time format everywhere** — `h:mm AM/PM`, localized to the **GPS-derived timezone**, with a zone abbreviation badge (**MT / PT / CT …**) that updates as we cross zones. Needs offline tz-from-GPS (coarse longitude/boundary lookup, no internet). Replace `snClockHM`/`snClockHMS` + any timestamp rendering.
-- [ ] **Weather tile (Home top-right)** — fill the empty top-right of the Home hub with **local weather based on GPS** (fetch over LTE, cache to the SSD for dead zones). Small current-conditions card.
+- [x] **Weather tile (Home top-right)** — fill the empty top-right of the Home hub with **local weather based on GPS** (fetch over LTE, cache to the SSD for dead zones). Small current-conditions card. *(CODED — Environment Canada current conditions: `weather-refresh.py` worker + `ec_weather.py` + `weather.{service,timer}` → `weather.json`, folded into `/api/state.weather`; `WeatherCard` on HomeHub with EC iconCode glyphs. Not yet deployed to hardware.)*
 
 ### C1 — Home page push-to-QR — DONE (2026-07-04, v0.7.0)
 - [x] Pressing **★ (the `options`/star key) on Home** shows the upload QR on demand (`MainScene.onKeyEvent` → re-parentable `QrScreen` route with `qrParent="home"`), so guests get the QR without navigating into Trips/Photos. (Chose the star key over the ECP `/input` deep-link idea.)
