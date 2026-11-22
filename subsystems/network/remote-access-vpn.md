@@ -4,6 +4,10 @@ How to reach Sally from anywhere. Sally's QX210 is on **cellular behind CGNAT** 
 
 ## Topology
 
+> **Placeholders:** the hub hostname (`hub.example.net`), UDP port (`51820`), WireGuard public keys and
+> WAN IPs (RFC 5737 `203.0.113.x` / `198.51.100.x`) in this doc are stand-ins. The real values live in the
+> gitignored `PRIVATE.md` at the repo root (operator-only); on the Pi they are in `/etc/wireguard/wg-home.conf`.
+
 ```
   your laptop ──WG──► home hub (DarkeRouter) ◄──WG── campingpi (site node) ──► Sally LAN
    10.10.10.2          MikroTik, hub.example.net:51820       10.10.10.12, keepalive 25   NETMAP 192.168.2.0/24
@@ -50,7 +54,7 @@ Fix: a watchdog timer on the Pi — **`scripts/wg-watchdog.sh`** + **`configs/ne
 - re-resolves `hub.example.net` and updates the peer endpoint in place if the hub IP moved (covers #2);
 - restarts the tunnel if no handshake within `STALE_AFTER` (150s) — catches any remaining wedge.
 
-Deploy with **`scripts/deploy-wg-watchdog.sh`** (key-based over the tunnel; `PI_HOST` defaults to `10.66.12.216`). Verified 2026-06-26: timer enabled + active, manual run logged `ok (handshake 70s ago, hub 203.0.113.10)`. Tune thresholds via env (`STALE_AFTER`, `HUB_HOST`, `HUB_PUBKEY`). Note this only papers over brownout-induced drops — fix the Pi's 5V feed too (see [`../power/`](../power/README.md)).
+Deploy with **`scripts/deploy-wg-watchdog.sh`** (key-based over the tunnel; `PI_HOST` defaults to `10.66.12.216`). Verified 2026-06-26: timer enabled + active, manual run logged `ok (handshake 70s ago, hub 203.0.113.10)`. The hub host/port/key are read from the `[Peer]` `Endpoint` + `PublicKey` in `/etc/wireguard/wg-home.conf` (nothing endpoint-specific is committed); override via env (`STALE_AFTER`, `HUB_HOST`, `HUB_PORT`, `HUB_PUBKEY`). Note this only papers over brownout-induced drops — fix the Pi's 5V feed too (see [`../power/`](../power/README.md)).
 
 > Ops gotcha: deploying over cellular while Sally is streaming (movie/tablet) → **bufferbloat ~3–4 s RTT**; multi-round-trip `scp` stalls. Use the single-connection base64 path (one SSH, files inlined) instead — `deploy-wg-watchdog.sh` is multi-hop and may time out under load.
 

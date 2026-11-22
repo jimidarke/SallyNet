@@ -47,7 +47,8 @@ octet preserved) — so from home you reach `.216` as `10.66.12.216`. WAN profil
 
 Sally's router is behind carrier **CGNAT** (IPv6 + NAT64, no inbound port-forward),
 so remote access is a **phone-home** WireGuard site node: `campingpi` dials a hub
-at home (`hub.example.net:51820` on DarkeRouter) and bridges the whole LAN in.
+at home (`hub.example.net:51820` on DarkeRouter — placeholder; the real endpoint is in the
+gitignored `PRIVATE.md`) and bridges the whole LAN in.
 
 Bring the tunnel up from this WSL box (the `.5` client), then SSH the Pi:
 

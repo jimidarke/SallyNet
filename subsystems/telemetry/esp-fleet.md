@@ -45,8 +45,8 @@ photo, 12V wiring diagnosis). No new hardware decisions block node #0.
   campsite or battery life disappoints.
 - **Secrets / security:** commit node YAMLs as **templates** (`!secret` + `REPLACE_WITH_*`
   placeholders, the repo convention); git-ignore the real `secrets.yaml` (WiFi creds, broker host,
-  OTA password). The existing cabin yaml is kept fully local today — it should migrate to this
-  template+secrets pattern.
+  OTA password). The cabin yaml (`configs/telemetry/cabin-temp-humidity.yaml`) follows this
+  pattern: `!secret` refs, with `configs/telemetry/secrets.yaml.example` as the template.
 - **Sensor-only nodes = WiFi is fine.** They never run BT, so they dodge the single-radio WiFi+BT
   time-slicing that bit the Pi 3B / ESP32 on the Halloween project — that conflict is why audio +
   always-on services move to the N100, not why sensors do.

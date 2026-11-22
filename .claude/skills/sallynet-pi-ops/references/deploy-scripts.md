@@ -64,7 +64,7 @@ single-connection base64 / scp** (lte-monitor, wg-watchdog — for over-the-tunn
 - **Steps:** install `wg-watchdog.sh` → `/opt/sally/net/` (0755),
   `sally-wg-watchdog.{service,timer}` → `/etc/systemd/system/`,
   `daemon-reload && enable --now sally-wg-watchdog.timer`; then a manual run.
-- **Verify:** the manual run logs e.g. `ok (handshake 70s ago, hub 203.0.113.10)`.
+- **Verify:** the manual run logs e.g. `ok (handshake 70s ago, hub <hub-wan-ip>)`.
 
 ## Adding a new deploy
 

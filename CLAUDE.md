@@ -27,6 +27,19 @@ Three-layer organisation:
 - **Mini-PC (planned, Intel N100 class) takes always-on services** (audio, telemetry, Roku media HTTP, MQTT broker, gpsd). **As of 2026-06-26 the Pi hosts gpsd + `sally-api` as the Phase-0/2 stopgap; these migrate to the N100 at Phase 3.** Pi 3B+ stays the pure RetroPie appliance. Rationale: ESP32 / Pi 3B+ time-slice WiFi and BT on a single radio (lesson from the Halloween project); the mini-PC has separate physical radios, no conflict. (WiFi + BT are now **disabled** on the Pi — it's wired-only — which also frees the PL011 UART for the router serial link.)
 - **FM transmitter is for music broadcast within Sally and immediate vicinity only** — strict BETS-1 compliance (< 1 µW EIRP). Never the voice channel. Camper-to-camper voice = amateur radio (see `subsystems/comms/amateur-radio-path.md`).
 
+## Credentials & private notes (never commit values)
+
+This repo is public. Every credential lives in a gitignored file next to a committed template:
+
+| What | Gitignored file | Committed template |
+|---|---|---|
+| Pi SSH password, Wi-Fi PSK, LuCI admin, tile/TMDB keys, HouseWall Roku dev password | `.env` | `.env.example` |
+| Camperoku Roku dev password + IP (`ROKU_DEV_PASSWORD`) | `roku-channel/.env` | `roku-channel/.env.example` |
+| ESPHome Wi-Fi/AP/OTA/API secrets (`!secret` refs) | `configs/telemetry/secrets.yaml` | `configs/telemetry/secrets.yaml.example` |
+| Real WireGuard hub endpoint, keys, WAN IPs, other operator-only facts | `PRIVATE.md` | — (read it locally if present) |
+
+Docs use placeholders for the home network (`hub.example.net`, `51820`, `<hub-public-key>`, RFC 5737 IPs). When a task needs the real value, read `PRIVATE.md` or the relevant `.env`; never paste values into tracked files, commit messages, or logs.
+
 ## File Paths on Sally's hardware
 
 ```

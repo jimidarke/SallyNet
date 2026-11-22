@@ -8,7 +8,7 @@
 #      NEVER retries. (oneshot units reject Restart=, so this watchdog IS the
 #      retry: it (re)starts the unit until the uplink is up.)
 #   2. DNS staleness — wg-quick resolves the Endpoint hostname only once, at
-#      setconf time. The hub (DarkeRouter) sits behind hub.example.net dynamic DNS, so
+#      setconf time. The hub (DarkeRouter) sits behind a dynamic-DNS name, so
 #      a hub WAN-IP change leaves us firing keepalives at a dead address forever.
 #
 # Self-contained on purpose (deployed standalone to /opt/sally/net/); output goes
@@ -16,9 +16,23 @@
 set -euo pipefail
 
 WG_IF="${WG_IF:-wg-home}"
-HUB_HOST="${HUB_HOST:-hub.example.net}"
-HUB_PORT="${HUB_PORT:-51820}"
-HUB_PUBKEY="${HUB_PUBKEY:-<hub-public-key>}"
+WG_CONF="${WG_CONF:-/etc/wireguard/${WG_IF}.conf}"
+
+# Hub endpoint + key come from the tunnel's own config on the Pi (the single
+# source of truth, never committed): the [Peer] `Endpoint = host:port` and
+# `PublicKey = ...` lines. Env vars still override for testing.
+conf_val() {  # conf_val <Key> -> first value of "Key = value" in $WG_CONF
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//Ip" "$WG_CONF" 2>/dev/null \
+    | head -n1 | tr -d '[:space:]'
+}
+endpoint="$(conf_val Endpoint || true)"
+HUB_HOST="${HUB_HOST:-${endpoint%:*}}"
+HUB_PORT="${HUB_PORT:-${endpoint##*:}}"
+HUB_PUBKEY="${HUB_PUBKEY:-$(conf_val PublicKey || true)}"
+if [ -z "$HUB_HOST" ] || [ -z "$HUB_PORT" ] || [ -z "$HUB_PUBKEY" ]; then
+  printf 'wg-watchdog: cannot read hub Endpoint/PublicKey from %s (set HUB_HOST, HUB_PORT, HUB_PUBKEY)\n' "$WG_CONF" >&2
+  exit 1
+fi
 STALE_AFTER="${STALE_AFTER:-150}"   # seconds without a handshake before we bounce
 UNIT="wg-quick@${WG_IF}"
 

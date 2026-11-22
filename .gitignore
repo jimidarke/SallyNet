@@ -4,6 +4,10 @@
 !.env.example
 *.key
 *.pem
+# ESPHome per-device secrets (template: configs/telemetry/secrets.yaml.example)
+secrets.yaml
+# Operator-only notes: real WAN/DDNS/WireGuard endpoints, device passwords
+PRIVATE.md
 
 # OS / editor cruft
 .DS_Store

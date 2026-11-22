@@ -12,6 +12,10 @@ Reuses the existing `homeController` VPN backbone (Scenario B).
 
 ## Topology
 
+> **Placeholders:** the hub hostname (`hub.example.net`), UDP port (`51820`), WireGuard public keys and
+> WAN IPs (RFC 5737 `203.0.113.x` / `198.51.100.x`) in this doc are stand-ins. The real values live in the
+> gitignored `PRIVATE.md` at the repo root (operator-only); on the Pi they are in `/etc/wireguard/wg-home.conf`.
+
 ```
   your laptop ──WG──► home hub (DarkeRouter) ◄──WG── campingpi (site node) ──► Sally LAN
    10.10.10.2          MikroTik, hub.example.net:51820       10.10.10.12, keepalive 25   NETMAP 192.168.2.0/24
@@ -70,7 +74,9 @@ deployed to `/opt/sally/net/wg-watchdog.sh`, fired every 60 s (`OnBootSec=60`,
 `OnUnitActiveSec=60`). Each tick: (re)start the unit if inactive (the boot-race retry),
 re-resolve `hub.example.net` and update the peer endpoint if the hub IP moved, and bounce the
 tunnel if no handshake within `STALE_AFTER` (150 s). Deploy with
-`scripts/deploy-wg-watchdog.sh`. Tune via env: `STALE_AFTER`, `HUB_HOST`, `HUB_PUBKEY`.
+`scripts/deploy-wg-watchdog.sh`. The hub host/port/key come from the `[Peer]` `Endpoint` +
+`PublicKey` in `/etc/wireguard/wg-home.conf`; override via env: `STALE_AFTER`, `HUB_HOST`,
+`HUB_PORT`, `HUB_PUBKEY`.
 
 The watchdog only papers over brownout drops — **also fix the Pi's 5 V feed**
 (`subsystems/power/`); under-voltage is logged on `campingpi`.
