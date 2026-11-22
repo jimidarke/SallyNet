@@ -14,7 +14,8 @@ RestartSec=3
 # scripts/deploy-sally-api.sh from the repo .env; '-' means start fine if it's absent. Lives
 # OUTSIDE the rsync'd app dir so `rsync --delete` never removes it.
 EnvironmentFile=-/opt/sally/sally-api.env
-# Override the home anchor / port here if needed:
+# The home anchor (SALLY_HOME_LAT/LON) comes from the repo .env via sally-api.env above; the
+# committed default is a public downtown-Edmonton point. Override the port here if needed:
 # Environment=SALLY_HOME_LAT=53.5461 SALLY_HOME_LON=-113.4938 SALLY_API_PORT=8090
 
 [Install]
