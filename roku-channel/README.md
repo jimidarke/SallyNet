@@ -33,7 +33,7 @@ channel/                # the Roku project (sideload root)
 cd channel
 npm install
 npm run lint                 # bsc --noEmit (no device needed)
-python3 scripts/generate_brand_assets.py    # emit icons/splash/mascot from ../images/mascot_orig.png
+python3 scripts/generate_brand_assets.py    # emit icons/splash/mascot from ../../images/SallyGenerated.png
 set -a && . ../.env && set +a
 npm run deploy              # roku-deploy sideload to $ROKU_IP (Camperoku must be ON + dev mode enabled)
 ```

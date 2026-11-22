@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SallyNet brand-asset pipeline.
 
-Reads the mascot source from ../../images/mascot_orig.png (repo root, NOT shipped)
+Reads the mascot source from images/SallyGenerated.png at the monorepo root (NOT shipped)
 and emits Roku-spec variants into ../images/ (referenced by the manifest + screens).
 
 Outputs (channel/images/):
@@ -21,8 +21,8 @@ import os
 from pathlib import Path
 from PIL import Image
 
-REPO = Path(__file__).resolve().parents[2]
-SRC = REPO / "images" / "mascot_orig.png"
+REPO = Path(__file__).resolve().parents[2]          # roku-channel/
+SRC = REPO.parent / "images" / "SallyGenerated.png"  # monorepo root images/
 OUT = REPO / "channel" / "images"
 
 GOLD_RGB = (0xE8, 0xA0, 0x44)   # SN_GOLD — splash letterbox + icon padding
